@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Secuenciador de Ruta — Rosen</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:#F4F3F3;color:#1a1d2e;padding:14px;max-width:780px;margin:0 auto}
+  h1{font-size:18px;color:#002E5D;font-weight:800}h1 span{color:#FF6600}
+  .sub{font-size:12px;color:#545454;margin:3px 0 12px}
+  .modebar{display:flex;gap:8px;margin-bottom:14px}
+  .modebar button{flex:1;border:1px solid #cdd6df;background:#fff;color:#002E5D;font-weight:700;font-size:14px;padding:11px;border-radius:10px;cursor:pointer}
+  .modebar button.on{background:#002E5D;color:#fff;border-color:#002E5D}
+  .card{background:#fff;border:1px solid #e2e6ea;border-radius:12px;padding:14px;margin-bottom:14px}
+  label{font-size:12px;font-weight:700;color:#002E5D;display:block;margin-bottom:6px}
+  .btn{border:none;border-radius:9px;padding:10px 15px;font-size:13.5px;font-weight:700;cursor:pointer}
+  .b1{background:#002E5D;color:#fff}.b2{background:#FF6600;color:#fff}.bg{background:#fff;color:#002E5D;border:1px solid #cdd6df}
+  .bok{background:#1a7a3c;color:#fff}
+  select,input[type=file]{width:100%;border:1px solid #dee2e6;border-radius:8px;padding:9px 10px;font-size:13.5px;outline:none}
+  .hint{font-size:11.5px;color:#545454;margin-top:8px}
+  .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+  .count{font-size:12.5px;color:#545454;margin:6px 0 8px}
+  #list{list-style:none}
+  .item{display:flex;align-items:center;gap:10px;background:#fff;border:1px solid #e2e6ea;border-left:5px solid #002E5D;border-radius:10px;padding:10px 12px;margin-bottom:8px;cursor:grab}
+  .item.drag{opacity:.4}
+  .seq{flex:0 0 36px;height:36px;border-radius:8px;background:#002E5D;color:#fff;font-weight:800;display:flex;align-items:center;justify-content:center;font-size:16px}
+  .info{flex:1;min-width:0}
+  .info .ord{font-weight:800;font-size:13.5px}
+  .info .cli{font-size:12.5px;color:#545454}
+  .info .dir{font-size:12.5px;margin-top:2px}
+  .info .dir a{color:#FF6600;text-decoration:underline}
+  .arrows{display:flex;flex-direction:column;gap:3px}
+  .arrows button{width:36px;height:25px;border:1px solid #cdd6df;background:#fff;border-radius:6px;font-size:13px;cursor:pointer;color:#002E5D;font-weight:700;line-height:1}
+  .arrows button:active{background:#FF6600;color:#fff}
+  .empty{color:#adb5bd;text-align:center;padding:22px;font-size:13px}
+  .rstat{display:flex;justify-content:space-between;align-items:center;padding:9px 11px;border:1px solid #e2e6ea;border-radius:9px;margin-bottom:7px;font-size:13px}
+  .badge{font-size:11px;font-weight:700;padding:2px 9px;border-radius:20px}
+  .b-open{background:#fdf2c7;color:#8a6a00}.b-done{background:#dbe7f3;color:#002E5D}.b-lock{background:#e6efe9;color:#1a7a3c}
+  .lockbanner{background:#e6efe9;color:#1a7a3c;border:1px solid #b7dcc4;border-radius:9px;padding:10px;font-weight:700;font-size:13px;text-align:center;margin-bottom:8px}
+  .toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:#002E5D;color:#fff;padding:9px 16px;border-radius:8px;font-size:13px;opacity:0;transition:.2s;pointer-events:none;z-index:9;max-width:90%}
+  .toast.show{opacity:1}.toast.err{background:#c0392b}
+  .hidden{display:none}
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body>
+  <h1>Secuenciador de Ruta · <span>Rosen</span></h1>
+  <div class="sub">El supervisor sube la planificación; cada chofer ordena y cierra su ruta desde el celular; el supervisor descarga la planilla con la secuencia.</div>
+
+  <div class="modebar">
+    <button id="m-sup" class="on" onclick="setMode('sup')">👤 Supervisor</button>
+    <button id="m-cho" onclick="setMode('cho')">🚚 Chofer</button>
+  </div>
+
+  <!-- ===== SUPERVISOR ===== -->
+  <div id="panel-sup">
+    <div class="card">
+      <label>1 · Subí el Excel de planificación</label>
+      <input type="file" id="file" accept=".xlsx,.xls" onchange="subirExcel(event)">
+      <div class="hint">Lee la hoja “Rpt. HojasRutas”, agrupa por chofer y lo publica para que cada uno ordene su ruta. (Re-subir reemplaza la jornada.)</div>
+    </div>
+    <div class="card">
+      <label>2 · Estado de las rutas <button class="btn bg" style="float:right;padding:5px 10px;font-size:12px" onclick="cargarEstado()">↻ Actualizar</button></label>
+      <div id="estado"><div class="empty">Subí la planificación o tocá “Actualizar”.</div></div>
+      <div class="actions">
+        <button class="btn b2" onclick="descargar()">⬇ Descargar planilla + secuencia</button>
+        <button class="btn bg" onclick="limpiarJornada()">🗑 Limpiar jornada (nuevo día)</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== CHOFER ===== -->
+  <div id="panel-cho" class="hidden">
+    <div class="card">
+      <label>Elegí tu ruta / patente <button class="btn bg" style="float:right;padding:5px 10px;font-size:12px" onclick="cargarChoferes()">↻</button></label>
+      <select id="chofer-sel" onchange="abrirRuta()"><option value="">— elegí tu patente —</option></select>
+    </div>
+    <div class="card" id="ruta-card" style="display:none">
+      <div id="rutalbl" style="font-weight:800;color:#002E5D;font-size:15px;margin-bottom:4px"></div>
+      <div id="lockwrap"></div>
+      <div class="count" id="count"></div>
+      <ul id="list"></ul>
+      <div class="actions" id="cho-actions">
+        <button class="btn b1" onclick="guardar()">💾 Guardar orden</button>
+        <button class="btn bok" onclick="cerrar()">🔒 Cerrar ruta</button>
+        <button class="btn bg" onclick="invertir()">Invertir</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+<script>
+// ===== Supabase (misma nube del portal) =====
+const SB_URL='https://uxyxdfbmfviofwdxmqsq.supabase.co';
+const SB_KEY='sb_publishable_SI6kt_9ioxvIg3VaZOqXdA_zrIry6pR';
+const TABLE='rosen_seq', JORNADA='actual';
+const H={'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json'};
+const $=id=>document.getElementById(id);
+function toast(m,e){const t=$('toast');t.textContent=m;t.className='toast show'+(e?' err':'');clearTimeout(t._t);t._t=setTimeout(()=>t.className='toast',2600);}
+async function sbGet(q){try{const r=await fetch(`${SB_URL}/rest/v1/${TABLE}?${q}`,{headers:H});if(!r.ok)throw 0;return await r.json();}catch(e){toast('No pude leer de la nube (¿tabla creada?)',1);return null;}}
+async function sbUpsert(rows){const r=await fetch(`${SB_URL}/rest/v1/${TABLE}`,{method:'POST',headers:{...H,'Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify(rows)});if(!r.ok){toast('No pude guardar en la nube ('+r.status+')',1);return false;}return true;}
+async function sbDelete(q){try{await fetch(`${SB_URL}/rest/v1/${TABLE}?${q}`,{method:'DELETE',headers:H});}catch(e){}}
+
+function setMode(m){
+  $('m-sup').classList.toggle('on',m==='sup');$('m-cho').classList.toggle('on',m==='cho');
+  $('panel-sup').classList.toggle('hidden',m!=='sup');$('panel-cho').classList.toggle('hidden',m!=='cho');
+  if(m==='sup')cargarEstado(); else cargarChoferes();
+}
+
+// ---------- SUPERVISOR: subir ----------
+function subirExcel(e){
+  const f=e.target.files[0];if(!f)return;
+  const rd=new FileReader();
+  rd.onload=async ev=>{
+    try{
+      const wb=XLSX.read(ev.target.result,{type:'binary'});
+      const ws=wb.Sheets['Rpt. HojasRutas']||wb.Sheets[wb.SheetNames[wb.SheetNames.length-1]];
+      const d=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+      const head=d[0].map(x=>String(x).trim());
+      const hl=head.map(x=>x.toLowerCase());
+      const ci=n=>hl.indexOf(n.toLowerCase());
+      const iO=ci('Nro.F12'),iC=ci('Cliente'),iD=ci('Dirección'),iCom=ci('Comuna');
+      let iCh=hl.findIndex(x=>x.includes('patente')||x.includes('vehic')||x.includes('ppu')); if(iCh<0)iCh=head.length-1; // RUTA = PATENTE (columna patente/vehículo, o la última)
+      if(iO<0){toast('No encontré la columna "Nro.F12"',1);return;}
+      const filas=d.slice(1).filter(r=>String(r[iO]||'').trim());
+      const byCh={},seen={};
+      filas.forEach(r=>{
+        const orden=String(r[iO]).trim(),chofer=String(iCh>=0?r[iCh]:'').trim()||'(sin patente)';
+        const k=chofer+'||'+orden;if(seen[k])return;seen[k]=1;
+        const dir=[String(iD>=0?r[iD]:'').trim(),String(iCom>=0?r[iCom]:'').trim()].filter(Boolean).join(', ');
+        (byCh[chofer]=byCh[chofer]||[]).push({orden,cliente:String(iC>=0?r[iC]:'').trim(),direccion:dir});
+      });
+      const rows=[];
+      // fila especial con la planilla original completa (para reexportar)
+      rows.push({jornada:JORNADA,chofer:'__PLANILLA__',data:{head,filas,iO,iCh},cerrada:false});
+      Object.keys(byCh).forEach(ch=>rows.push({jornada:JORNADA,chofer:ch,data:{paradas:byCh[ch],seq:byCh[ch].map(p=>p.orden)},cerrada:false}));
+      await sbDelete('jornada=eq.'+JORNADA); // limpia la jornada anterior para no mezclar rutas viejas
+      const ok=await sbUpsert(rows);
+      if(ok){toast('Publicado: '+Object.keys(byCh).length+' rutas. Los choferes ya pueden ordenar.');cargarEstado();}
+    }catch(err){toast('Error: '+err.message,1);}
+  };
+  rd.readAsBinaryString(f);
+}
+
+// ---------- SUPERVISOR: estado + reabrir ----------
+async function cargarEstado(){
+  const rows=await sbGet(`jornada=eq.${JORNADA}&select=chofer,cerrada,data&chofer=neq.__PLANILLA__`);
+  const box=$('estado');
+  if(!rows){return;}
+  if(!rows.length){box.innerHTML='<div class="empty">Aún no hay rutas publicadas. Subí la planificación.</div>';return;}
+  box.innerHTML=rows.sort((a,b)=>a.chofer.localeCompare(b.chofer)).map(r=>{
+    const n=(r.data&&r.data.paradas)?r.data.paradas.length:0;
+    const st=r.cerrada?'<span class="badge b-lock">🔒 Cerrada</span>':'<span class="badge b-open">Abierta</span>';
+    const re=r.cerrada?`<button class="btn bg" style="padding:4px 9px;font-size:11px;margin-left:8px" onclick="reabrir('${r.chofer.replace(/'/g,"")}')">Reabrir</button>`:'';
+    return `<div class="rstat"><span><b>${r.chofer}</b> · ${n} paradas</span><span>${st}${re}</span></div>`;
+  }).join('');
+}
+async function reabrir(ch){
+  const ok=await sbUpsert([{jornada:JORNADA,chofer:ch,cerrada:false}]);
+  if(ok){toast('Ruta de '+ch+' reabierta');cargarEstado();}
+}
+async function limpiarJornada(){
+  if(!confirm('¿Limpiar la jornada? Se borran TODAS las rutas y secuencias cargadas. Usalo al empezar el día, antes de subir la nueva planificación.'))return;
+  await sbDelete('jornada=eq.'+JORNADA);
+  toast('Jornada limpiada — subí la planificación del día'); cargarEstado();
+}
+
+// ---------- SUPERVISOR: descargar planilla + secuencia ----------
+async function descargar(){
+  const all=await sbGet(`jornada=eq.${JORNADA}&select=chofer,data`);
+  if(!all||!all.length){toast('No hay datos para descargar',1);return;}
+  const pl=all.find(r=>r.chofer==='__PLANILLA__');
+  if(!pl){toast('Falta la planilla original (re-subí)',1);return;}
+  const {head,filas,iO}=pl.data;
+  const seqMap={};
+  all.filter(r=>r.chofer!=='__PLANILLA__'&&r.data&&r.data.seq).forEach(r=>{r.data.seq.forEach((orden,i)=>seqMap[orden]=i+1);});
+  const aoa=[head.concat(['SECUENCIA'])];
+  filas.forEach(f=>{const orden=String(f[iO]||'').trim();aoa.push(f.concat([seqMap[orden]||'']));});
+  const ws=XLSX.utils.aoa_to_sheet(aoa),wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Rpt. HojasRutas');
+  const d=new Date();
+  XLSX.writeFile(wb,'Planificacion_Rosen_secuenciada_'+d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')+'.xlsx');
+  toast('Planilla descargada con la columna SECUENCIA');
+}
+
+// ---------- CHOFER ----------
+let items=[],curChofer='',curCerrada=false;
+async function cargarChoferes(){
+  const rows=await sbGet(`jornada=eq.${JORNADA}&select=chofer&chofer=neq.__PLANILLA__`);
+  const sel=$('chofer-sel');
+  if(!rows||!rows.length){sel.innerHTML='<option value="">— no hay rutas publicadas —</option>';return;}
+  sel.innerHTML='<option value="">— elegí tu patente —</option>'+rows.sort((a,b)=>a.chofer.localeCompare(b.chofer)).map(r=>`<option value="${r.chofer.replace(/"/g,'')}">${r.chofer}</option>`).join('');
+}
+async function abrirRuta(){
+  const ch=$('chofer-sel').value;if(!ch){$('ruta-card').style.display='none';return;}
+  const rows=await sbGet(`jornada=eq.${JORNADA}&chofer=eq.${encodeURIComponent(ch)}&select=chofer,data,cerrada`);
+  if(!rows||!rows.length){toast('No encontré esa ruta',1);return;}
+  const r=rows[0];curChofer=ch;curCerrada=!!r.cerrada;
+  const paradas=r.data.paradas||[],seq=r.data.seq||paradas.map(p=>p.orden);
+  // ordenar paradas según seq guardado
+  const byOrd={};paradas.forEach(p=>byOrd[p.orden]=p);
+  items=seq.map(o=>byOrd[o]).filter(Boolean);
+  paradas.forEach(p=>{if(!seq.includes(p.orden))items.push(p);});
+  $('ruta-card').style.display='block';
+  $('rutalbl').textContent='Patente: '+ch;
+  render();
+}
+function render(){
+  const ul=$('list');
+  $('lockwrap').innerHTML=curCerrada?'<div class="lockbanner">🔒 Ruta cerrada. Avisá al supervisor si necesitás reabrirla.</div>':'';
+  $('cho-actions').style.display=curCerrada?'none':'flex';
+  $('count').textContent=items.length+' paradas'+(curCerrada?'':' — arrastrá o usá ▲▼ para ordenar');
+  if(!items.length){ul.innerHTML='<div class="empty">Sin paradas.</div>';return;}
+  ul.innerHTML='';
+  items.forEach((it,i)=>{
+    const li=document.createElement('li');li.className='item';li.dataset.i=i;
+    if(!curCerrada)li.draggable=true;
+    const maps=it.direccion?`<div class="dir">📍 <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(it.direccion)}" target="_blank" rel="noopener">${it.direccion}</a></div>`:'';
+    li.innerHTML=`<div class="seq">${i+1}</div><div class="info"><div class="ord">${it.orden}</div><div class="cli">${it.cliente||'—'}</div>${maps}</div>`+
+      (curCerrada?'':`<div class="arrows"><button onclick="mover(${i},-1)">▲</button><button onclick="mover(${i},1)">▼</button></div>`);
+    if(!curCerrada){
+      li.addEventListener('dragstart',e=>{li.classList.add('drag');e.dataTransfer.setData('t',i);});
+      li.addEventListener('dragend',()=>li.classList.remove('drag'));
+      li.addEventListener('dragover',e=>e.preventDefault());
+      li.addEventListener('drop',e=>{e.preventDefault();reord(+e.dataTransfer.getData('t'),i);});
+    }
+    ul.appendChild(li);
+  });
+}
+function mover(i,d){const j=i+d;if(j<0||j>=items.length)return;[items[i],items[j]]=[items[j],items[i]];render();}
+function reord(from,to){if(from===to)return;const x=items.splice(from,1)[0];items.splice(to,0,x);render();}
+function invertir(){items.reverse();render();}
+async function guardar(){
+  const ok=await sbUpsert([{jornada:JORNADA,chofer:curChofer,data:{paradas:items,seq:items.map(p=>p.orden)},cerrada:false}]);
+  if(ok)toast('Orden guardado ✓');
+}
+async function cerrar(){
+  if(!confirm('¿Cerrar la ruta? Queda bloqueada hasta que el supervisor la reabra.'))return;
+  const ok=await sbUpsert([{jornada:JORNADA,chofer:curChofer,data:{paradas:items,seq:items.map(p=>p.orden)},cerrada:true}]);
+  if(ok){curCerrada=true;render();toast('Ruta cerrada 🔒');}
+}
+cargarEstado();
+</script>
+</body>
+</html>
