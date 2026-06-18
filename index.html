@@ -55,17 +55,28 @@
 
   <!-- ===== SUPERVISOR ===== -->
   <div id="panel-sup">
-    <div class="card">
-      <label>1 · Subí el Excel de planificación</label>
-      <input type="file" id="file" accept=".xlsx,.xls" onchange="subirExcel(event)">
-      <div class="hint">Lee la hoja “Rpt. HojasRutas”, agrupa por chofer y lo publica para que cada uno ordene su ruta. (Re-subir reemplaza la jornada.)</div>
+    <div class="card" id="sup-login">
+      <label>🔒 Acceso supervisor</label>
+      <input type="email" id="sup-email" placeholder="Email" style="margin-bottom:8px" onkeydown="if(event.key==='Enter')supLogin()">
+      <input type="password" id="sup-pass" placeholder="Contraseña" onkeydown="if(event.key==='Enter')supLogin()">
+      <div class="actions"><button class="btn b1" onclick="supLogin()">Ingresar</button></div>
+      <div id="sup-err" style="color:#c0392b;font-size:12.5px;margin-top:8px;display:none"></div>
+      <div class="hint">El modo Chofer no necesita login. Solo el supervisor entra con clave.</div>
     </div>
-    <div class="card">
-      <label>2 · Estado de las rutas <button class="btn bg" style="float:right;padding:5px 10px;font-size:12px" onclick="cargarEstado()">↻ Actualizar</button></label>
-      <div id="estado"><div class="empty">Subí la planificación o tocá “Actualizar”.</div></div>
-      <div class="actions">
-        <button class="btn b2" onclick="descargar()">⬇ Descargar planilla + secuencia</button>
-        <button class="btn bg" onclick="limpiarJornada()">🗑 Limpiar jornada (nuevo día)</button>
+    <div id="sup-tools" class="hidden">
+      <div style="text-align:right;margin-bottom:8px"><button class="btn bg" style="padding:5px 10px;font-size:12px" onclick="supLogout()">Cerrar sesión</button></div>
+      <div class="card">
+        <label>1 · Subí el Excel de planificación</label>
+        <input type="file" id="file" accept=".xlsx,.xls" onchange="subirExcel(event)">
+        <div class="hint">Lee la hoja “Rpt. HojasRutas”, agrupa por chofer y lo publica para que cada uno ordene su ruta. (Re-subir reemplaza la jornada.)</div>
+      </div>
+      <div class="card">
+        <label>2 · Estado de las rutas <button class="btn bg" style="float:right;padding:5px 10px;font-size:12px" onclick="cargarEstado()">↻ Actualizar</button></label>
+        <div id="estado"><div class="empty">Subí la planificación o tocá “Actualizar”.</div></div>
+        <div class="actions">
+          <button class="btn b2" onclick="descargar()">⬇ Descargar planilla + secuencia</button>
+          <button class="btn bg" onclick="limpiarJornada()">🗑 Limpiar jornada (nuevo día)</button>
+        </div>
       </div>
     </div>
   </div>
@@ -102,10 +113,25 @@ async function sbGet(q){try{const r=await fetch(`${SB_URL}/rest/v1/${TABLE}?${q}
 async function sbUpsert(rows){const r=await fetch(`${SB_URL}/rest/v1/${TABLE}`,{method:'POST',headers:{...H,'Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify(rows)});if(!r.ok){toast('No pude guardar en la nube ('+r.status+')',1);return false;}return true;}
 async function sbDelete(q){try{await fetch(`${SB_URL}/rest/v1/${TABLE}?${q}`,{method:'DELETE',headers:H});}catch(e){}}
 
+// ===== Acceso supervisor (bloqueo a nivel de interfaz; el modo Chofer queda abierto) =====
+let supAuth=false;
+const SUP_EMAIL='natalia.gonzalez@bigticket.cl', SUP_PASS='secuencia';
+function norm(s){return(s||'').toLowerCase().trim().normalize('NFD').replace(/[̀-ͯ]/g,'');}
+function supLogin(){
+  const e=norm($('sup-email').value),p=($('sup-pass').value||'').trim();
+  if(e===SUP_EMAIL&&p===SUP_PASS){supAuth=true;try{sessionStorage.setItem('supAuth','1');}catch(_){}renderSup();}
+  else{const er=$('sup-err');er.style.display='block';er.textContent='Email o contraseña incorrectos.';}
+}
+function supLogout(){supAuth=false;try{sessionStorage.removeItem('supAuth');}catch(_){}renderSup();}
+function renderSup(){
+  $('sup-login').classList.toggle('hidden',supAuth);
+  $('sup-tools').classList.toggle('hidden',!supAuth);
+  if(supAuth)cargarEstado();
+}
 function setMode(m){
   $('m-sup').classList.toggle('on',m==='sup');$('m-cho').classList.toggle('on',m==='cho');
   $('panel-sup').classList.toggle('hidden',m!=='sup');$('panel-cho').classList.toggle('hidden',m!=='cho');
-  if(m==='sup')cargarEstado(); else cargarChoferes();
+  if(m==='sup')renderSup(); else cargarChoferes();
 }
 
 // ---------- SUPERVISOR: subir ----------
@@ -240,7 +266,8 @@ async function cerrar(){
   const ok=await sbUpsert([{jornada:JORNADA,chofer:curChofer,data:{paradas:items,seq:items.map(p=>p.orden)},cerrada:true}]);
   if(ok){curCerrada=true;render();toast('Ruta cerrada 🔒');}
 }
-cargarEstado();
+try{supAuth=sessionStorage.getItem('supAuth')==='1';}catch(_){}
+renderSup();
 </script>
 </body>
 </html>
