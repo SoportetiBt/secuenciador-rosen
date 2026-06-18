@@ -41,7 +41,16 @@
   .toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:#002E5D;color:#fff;padding:9px 16px;border-radius:8px;font-size:13px;opacity:0;transition:.2s;pointer-events:none;z-index:9;max-width:90%}
   .toast.show{opacity:1}.toast.err{background:#c0392b}
   .hidden{display:none}
+  /* ===== Mapa embebido AL LADO de la lista (apila en celular) ===== */
+  .split{display:flex;gap:12px;align-items:flex-start}
+  #map{flex:1 1 50%;min-width:0;height:420px;position:sticky;top:8px;border:1px solid #e2e6ea;border-radius:10px;overflow:hidden;z-index:0}
+  .split #list{flex:1 1 50%;max-height:420px;overflow:auto}
+  @media(max-width:680px){.split{flex-direction:column}#map{width:100%;flex:none;height:280px}.split #list{width:100%;max-height:none}}
+  .pin{width:28px;height:28px;border-radius:50%;background:#002E5D;color:#fff;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px}
+  .pin.first{background:#1a7a3c}.pin.last{background:#FF6600}
 </style>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
@@ -91,7 +100,11 @@
       <div id="rutalbl" style="font-weight:800;color:#002E5D;font-size:15px;margin-bottom:4px"></div>
       <div id="lockwrap"></div>
       <div class="count" id="count"></div>
-      <ul id="list"></ul>
+      <div class="split">
+        <div id="map"></div>
+        <ul id="list"></ul>
+      </div>
+      <div style="margin:10px 0"><button class="btn b2" style="width:100%" onclick="navegarMaps()">🧭 Navegar en Google Maps</button></div>
       <div class="actions" id="cho-actions">
         <button class="btn b1" onclick="guardar()">💾 Guardar orden</button>
         <button class="btn bok" onclick="cerrar()">🔒 Cerrar ruta</button>
@@ -141,21 +154,25 @@ function subirExcel(e){
   rd.onload=async ev=>{
     try{
       const wb=XLSX.read(ev.target.result,{type:'binary'});
-      const ws=wb.Sheets['Rpt. HojasRutas']||wb.Sheets[wb.SheetNames[wb.SheetNames.length-1]];
+      let ws=null; for(const s of ['Formato por defecto lastmile','Rpt. HojasRutas']){if(wb.Sheets[s]){ws=wb.Sheets[s];break;}} if(!ws)ws=wb.Sheets[wb.SheetNames[0]];
       const d=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
       const head=d[0].map(x=>String(x).trim());
       const hl=head.map(x=>x.toLowerCase());
-      const ci=n=>hl.indexOf(n.toLowerCase());
-      const iO=ci('Nro.F12'),iC=ci('Cliente'),iD=ci('Dirección'),iCom=ci('Comuna');
-      let iCh=hl.findIndex(x=>x.includes('patente')||x.includes('vehic')||x.includes('ppu')); if(iCh<0)iCh=head.length-1; // RUTA = PATENTE (columna patente/vehículo, o la última)
-      if(iO<0){toast('No encontré la columna "Nro.F12"',1);return;}
+      const find=(...names)=>{for(const n of names){const i=hl.findIndex(x=>x===n||x.includes(n));if(i>=0)return i;}return -1;};
+      const iO=find('numero guia','nro.f12','guia','orden');                 // N° de orden/guía
+      let iCh=find('vehiculo','vehículo','patente','ppu'); if(iCh<0)iCh=head.length-1; // RUTA = patente/vehículo
+      const iC=find('nombre contacto','cliente','contacto');
+      const iD=find('direccion','dirección'), iCom=find('comuna');
+      const iLat=find('latitud','lat'), iLng=find('longitud','lng','lon');
+      if(iO<0){toast('No encontré la columna de N° de guía/orden',1);return;}
       const filas=d.slice(1).filter(r=>String(r[iO]||'').trim());
       const byCh={},seen={};
       filas.forEach(r=>{
-        const orden=String(r[iO]).trim(),chofer=String(iCh>=0?r[iCh]:'').trim()||'(sin patente)';
+        const orden=String(r[iO]).trim(),chofer=String(r[iCh]||'').trim()||'(sin patente)';
         const k=chofer+'||'+orden;if(seen[k])return;seen[k]=1;
         const dir=[String(iD>=0?r[iD]:'').trim(),String(iCom>=0?r[iCom]:'').trim()].filter(Boolean).join(', ');
-        (byCh[chofer]=byCh[chofer]||[]).push({orden,cliente:String(iC>=0?r[iC]:'').trim(),direccion:dir});
+        const lat=iLat>=0?String(r[iLat]||'').trim():'', lng=iLng>=0?String(r[iLng]||'').trim():'';
+        (byCh[chofer]=byCh[chofer]||[]).push({orden,cliente:String(iC>=0?r[iC]:'').trim(),direccion:dir,lat,lng});
       });
       const rows=[];
       // fila especial con la planilla original completa (para reexportar)
@@ -192,22 +209,21 @@ async function limpiarJornada(){
   toast('Jornada limpiada — subí la planificación del día'); cargarEstado();
 }
 
-// ---------- SUPERVISOR: descargar planilla + secuencia ----------
+// ---------- SUPERVISOR: descargar (solo Patente, Orden, Secuencia) ----------
 async function descargar(){
-  const all=await sbGet(`jornada=eq.${JORNADA}&select=chofer,data`);
+  const all=await sbGet(`jornada=eq.${JORNADA}&select=chofer,data&chofer=neq.__PLANILLA__`);
   if(!all||!all.length){toast('No hay datos para descargar',1);return;}
-  const pl=all.find(r=>r.chofer==='__PLANILLA__');
-  if(!pl){toast('Falta la planilla original (re-subí)',1);return;}
-  const {head,filas,iO}=pl.data;
-  const seqMap={};
-  all.filter(r=>r.chofer!=='__PLANILLA__'&&r.data&&r.data.seq).forEach(r=>{r.data.seq.forEach((orden,i)=>seqMap[orden]=i+1);});
-  const aoa=[head.concat(['SECUENCIA'])];
-  filas.forEach(f=>{const orden=String(f[iO]||'').trim();aoa.push(f.concat([seqMap[orden]||'']));});
+  const aoa=[['Patente','Orden','Secuencia']];
+  all.sort((a,b)=>a.chofer.localeCompare(b.chofer)).forEach(r=>{
+    const seq=(r.data&&r.data.seq)||[];
+    seq.forEach((orden,i)=>aoa.push([r.chofer,orden,i+1]));
+  });
+  if(aoa.length<2){toast('Aún no hay secuencias cargadas por los choferes',1);return;}
   const ws=XLSX.utils.aoa_to_sheet(aoa),wb=XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb,ws,'Rpt. HojasRutas');
+  XLSX.utils.book_append_sheet(wb,ws,'Secuencia');
   const d=new Date();
-  XLSX.writeFile(wb,'Planificacion_Rosen_secuenciada_'+d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')+'.xlsx');
-  toast('Planilla descargada con la columna SECUENCIA');
+  XLSX.writeFile(wb,'Secuencia_Rosen_'+d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')+'.xlsx');
+  toast('Excel descargado: Patente, Orden, Secuencia');
 }
 
 // ---------- CHOFER ----------
@@ -231,6 +247,7 @@ async function abrirRuta(){
   $('ruta-card').style.display='block';
   $('rutalbl').textContent='Patente: '+ch;
   render();
+  ensureMap();
 }
 function render(){
   const ul=$('list');
@@ -253,10 +270,40 @@ function render(){
     }
     ul.appendChild(li);
   });
+  if(MAP)renderMap(false);
 }
 function mover(i,d){const j=i+d;if(j<0||j>=items.length)return;[items[i],items[j]]=[items[j],items[i]];render();}
 function reord(from,to){if(from===to)return;const x=items.splice(from,1)[0];items.splice(to,0,x);render();}
 function invertir(){items.reverse();render();}
+let MAP=null,MAPLAYERS=[];
+function ensureMap(){
+  if(!document.getElementById('map'))return;
+  if(!MAP){MAP=L.map('map');L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap',maxZoom:19}).addTo(MAP);}
+  renderMap(true);                       // al abrir la ruta, encuadra todo
+  setTimeout(()=>{if(MAP)MAP.invalidateSize()},250);
+}
+function renderMap(fit){                  // redibuja pines+línea según el orden actual (en vivo)
+  if(!MAP)return;
+  MAPLAYERS.forEach(l=>MAP.removeLayer(l));MAPLAYERS=[];
+  const pts=items.map((it,i)=>{const la=parseFloat(it.lat),lo=parseFloat(it.lng);return{n:i+1,la,lo,it,ok:!isNaN(la)&&!isNaN(lo)&&(la||lo)};}).filter(p=>p.ok);
+  if(!pts.length)return;
+  const ll=[];
+  pts.forEach(p=>{
+    ll.push([p.la,p.lo]);
+    const cls='pin'+(p.n===1?' first':'')+(p.n===pts.length?' last':'');
+    const m=L.marker([p.la,p.lo],{icon:L.divIcon({className:'',html:'<div class="'+cls+'">'+p.n+'</div>',iconSize:[28,28],iconAnchor:[14,14]})}).addTo(MAP);
+    m.bindPopup('<b>#'+p.n+' · '+p.it.orden+'</b><br>'+(p.it.cliente||'')+'<br>'+(p.it.direccion||''));
+    MAPLAYERS.push(m);
+  });
+  const pl=L.polyline(ll,{color:'#002E5D',weight:3,opacity:.55}).addTo(MAP);MAPLAYERS.push(pl);
+  if(fit)MAP.fitBounds(ll,{padding:[30,30]});  // al reordenar NO re-encuadra (respeta su zoom)
+}
+function navegarMaps(){
+  // "Navegar": abre Google Maps con los primeros tramos (Maps soporta ~10 paradas).
+  const pts=items.map(it=>{const la=parseFloat(it.lat),lo=parseFloat(it.lng);if(it.lat&&it.lng&&!isNaN(la)&&!isNaN(lo)&&(la||lo))return la+','+lo;return it.direccion?encodeURIComponent(it.direccion):'';}).filter(Boolean);
+  if(!pts.length){toast('Sin datos para navegar',1);return;}
+  window.open('https://www.google.com/maps/dir/'+pts.slice(0,10).join('/'),'_blank');
+}
 async function guardar(){
   const ok=await sbUpsert([{jornada:JORNADA,chofer:curChofer,data:{paradas:items,seq:items.map(p=>p.orden)},cerrada:false}]);
   if(ok)toast('Orden guardado ✓');
