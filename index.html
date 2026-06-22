@@ -201,7 +201,10 @@
 // ===== Supabase (misma nube del portal) =====
 const SB_URL='https://uxyxdfbmfviofwdxmqsq.supabase.co';
 const SB_KEY='sb_publishable_SI6kt_9ioxvIg3VaZOqXdA_zrIry6pR';
-const TABLE='rosen_seq', JORNADA='actual';
+const TABLE='rosen_seq';
+// La jornada es POR DÍA: cada día arranca limpio (no aparecen rutas viejas/cerradas de días anteriores),
+// pero dentro del mismo día se pueden sumar varios archivos (Rosen V + Rosen IV).
+const _hoy=new Date(); const JORNADA='d'+_hoy.getFullYear()+'-'+String(_hoy.getMonth()+1).padStart(2,'0')+'-'+String(_hoy.getDate()).padStart(2,'0');
 const H={'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json'};
 const $=id=>document.getElementById(id);
 function toast(m,e){const t=$('toast');t.textContent=m;t.className='toast show'+(e?' err':'');clearTimeout(t._t);t._t=setTimeout(()=>t.className='toast',2600);}
@@ -357,7 +360,7 @@ async function descargarRuta(ch){
 }
 
 // ---------- CHOFER ----------
-let items=[],curChofer='',curCerrada=false;
+let items=[],curChofer='',curCerrada=false,curLote='';
 async function cargarChoferes(){
   const rows=await sbGet(`jornada=eq.${JORNADA}&select=chofer&chofer=neq.__PLANILLA__`);
   const sel=$('chofer-sel');
@@ -368,7 +371,7 @@ async function abrirRuta(){
   const ch=$('chofer-sel').value;if(!ch){$('ruta-card').style.display='none';return;}
   const rows=await sbGet(`jornada=eq.${JORNADA}&chofer=eq.${encodeURIComponent(ch)}&select=chofer,data,cerrada`);
   if(!rows||!rows.length){toast('No encontré esa ruta',1);return;}
-  const r=rows[0];curChofer=ch;curCerrada=!!r.cerrada;
+  const r=rows[0];curChofer=ch;curCerrada=!!r.cerrada;curLote=(r.data&&r.data.lote)||'';
   const paradas=r.data.paradas||[],seq=r.data.seq||paradas.map(p=>p.orden);
   // ordenar paradas según seq guardado
   const byOrd={};paradas.forEach(p=>byOrd[p.orden]=p);
@@ -441,12 +444,12 @@ function navegarMaps(){
   window.open('https://www.google.com/maps/dir/'+pts.slice(0,10).join('/'),'_blank');
 }
 async function guardar(){
-  const ok=await sbUpsert([{jornada:JORNADA,chofer:curChofer,data:{paradas:items,seq:items.map(p=>p.orden)},cerrada:false}]);
+  const ok=await sbUpsert([{jornada:JORNADA,chofer:curChofer,data:{paradas:items,seq:items.map(p=>p.orden),lote:curLote},cerrada:false}]);
   if(ok)toast('Orden guardado ✓');
 }
 async function cerrar(){
   if(!confirm('¿Cerrar la ruta? Queda bloqueada hasta que el supervisor la reabra.'))return;
-  const ok=await sbUpsert([{jornada:JORNADA,chofer:curChofer,data:{paradas:items,seq:items.map(p=>p.orden)},cerrada:true}]);
+  const ok=await sbUpsert([{jornada:JORNADA,chofer:curChofer,data:{paradas:items,seq:items.map(p=>p.orden),lote:curLote},cerrada:true}]);
   if(ok){curCerrada=true;render();toast('Ruta cerrada 🔒');}
 }
 // ================= MALLA DE ROTACIÓN =================
