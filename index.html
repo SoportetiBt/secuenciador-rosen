@@ -126,7 +126,7 @@
           <div id="estado"><div class="empty">Subí la planificación o tocá “Actualizar”.</div></div>
           <div class="actions">
             <button class="btn b2" onclick="descargar()">⬇ Descargar secuencia<span id="dl-lote-lbl"></span></button>
-            <button class="btn bg" onclick="limpiarJornada()">🗑 Limpiar jornada (nuevo día)</button>
+            <button class="btn bg" onclick="limpiarJornada()">🗑 <span id="limpiar-lbl">Limpiar jornada (nuevo día)</span></button>
           </div>
         </div>
       </div>
@@ -304,6 +304,7 @@ function renderEstado(){
   if(!rows.length){box.innerHTML='<div class="empty">Aún no hay rutas publicadas. Subí la planificación.</div>';$('dl-lote-lbl').textContent='';return;}
   const f=($('lote-filtro')&&$('lote-filtro').value)||'';
   $('dl-lote-lbl').textContent=f?' ('+f+')':'';
+  if($('limpiar-lbl'))$('limpiar-lbl').textContent=f?('Eliminar lote: '+f):'Limpiar jornada (nuevo día)';
   const vis=f?rows.filter(r=>loteDe(r)===f):rows;
   if(!vis.length){box.innerHTML='<div class="empty">No hay patentes en ese lote.</div>';return;}
   box.innerHTML=vis.slice().sort((a,b)=>a.chofer.localeCompare(b.chofer)).map(r=>{
@@ -320,7 +321,16 @@ async function reabrir(ch){
   if(ok){toast('Ruta de '+ch+' reabierta');cargarEstado();}
 }
 async function limpiarJornada(){
-  if(!confirm('¿Limpiar la jornada? Se borran TODAS las rutas y secuencias cargadas. Usalo al empezar el día, antes de subir la nueva planificación.'))return;
+  const f=($('lote-filtro')&&$('lote-filtro').value)||'';
+  if(f){   // hay un lote filtrado → borra SOLO ese lote, deja el resto intacto
+    const chs=[...new Set((_estadoRows||[]).filter(r=>loteDe(r)===f).map(r=>r.chofer))];
+    if(!chs.length){toast('No hay patentes en ese lote',1);return;}
+    if(!confirm('¿Eliminar el lote “'+f+'”? Se borran solo esas '+chs.length+' patentes y sus secuencias. El resto (otros lotes) queda intacto.'))return;
+    for(const ch of chs){await sbDelete('jornada=eq.'+JORNADA+'&chofer=eq.'+encodeURIComponent(ch));}
+    if($('lote-filtro'))$('lote-filtro').value='';
+    toast('Lote eliminado: '+f); cargarEstado(); return;
+  }
+  if(!confirm('¿Limpiar TODA la jornada? Se borran TODAS las rutas y secuencias (todos los lotes). Usalo al empezar el día. Si querés borrar solo un archivo, filtralo arriba primero.'))return;
   await sbDelete('jornada=eq.'+JORNADA);
   toast('Jornada limpiada — subí la planificación del día'); cargarEstado();
 }
