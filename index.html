@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Secuenciador de Ruta — Rosen</title>
+<title>Consola de Operaciones — Rosen</title>
 <style>
   *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
   body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:#F4F3F3;color:#1a1d2e;padding:14px;max-width:780px;margin:0 auto}
@@ -34,13 +34,15 @@
   .arrows button{width:36px;height:25px;border:1px solid #cdd6df;background:#fff;border-radius:6px;font-size:13px;cursor:pointer;color:#002E5D;font-weight:700;line-height:1}
   .arrows button:active{background:#FF6600;color:#fff}
   .empty{color:#adb5bd;text-align:center;padding:22px;font-size:13px}
-  .rstat{display:flex;justify-content:space-between;align-items:center;padding:9px 11px;border:1px solid #e2e6ea;border-radius:9px;margin-bottom:7px;font-size:13px}
-  .badge{font-size:11px;font-weight:700;padding:2px 9px;border-radius:20px}
+  .rstat{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 12px;border:1px solid #e2e6ea;border-radius:10px;margin-bottom:7px;font-size:13px;width:100%;box-sizing:border-box}
+  .rstat .rsl{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .rstat .rsr{flex-shrink:0;display:inline-flex;align-items:center;gap:8px}
+  .badge{font-size:11px;font-weight:700;border-radius:20px;display:inline-flex;align-items:center;justify-content:center;min-width:66px;height:22px;padding:0 8px}
   .b-open{background:#fdf2c7;color:#8a6a00}.b-done{background:#dbe7f3;color:#002E5D}.b-lock{background:#e6efe9;color:#1a7a3c}
   .lockbanner{background:#e6efe9;color:#1a7a3c;border:1px solid #b7dcc4;border-radius:9px;padding:10px;font-weight:700;font-size:13px;text-align:center;margin-bottom:8px}
   .toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:#002E5D;color:#fff;padding:9px 16px;border-radius:8px;font-size:13px;opacity:0;transition:.2s;pointer-events:none;z-index:9;max-width:90%}
   .toast.show{opacity:1}.toast.err{background:#c0392b}
-  .hidden{display:none}
+  .hidden{display:none !important}
   /* ===== Mapa embebido AL LADO de la lista (apila en celular) ===== */
   .split{display:flex;gap:12px;align-items:flex-start}
   #map{flex:1 1 50%;min-width:0;height:420px;position:sticky;top:8px;border:1px solid #e2e6ea;border-radius:10px;overflow:hidden;z-index:0}
@@ -48,14 +50,45 @@
   @media(max-width:680px){.split{flex-direction:column}#map{width:100%;flex:none;height:280px}.split #list{width:100%;max-height:none}}
   .pin{width:28px;height:28px;border-radius:50%;background:#002E5D;color:#fff;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px}
   .pin.first{background:#1a7a3c}.pin.last{background:#FF6600}
+  .pin.multi{background:#FF6600;font-size:10px;border-radius:50%}
+  /* ===== Sub-pestañas supervisor + Malla ===== */
+  .subtabs{display:flex;gap:6px;margin-bottom:12px}
+  .subtabs button{flex:1;border:1px solid #cdd6df;background:#fff;color:#002E5D;font-weight:700;font-size:13px;padding:9px;border-radius:9px;cursor:pointer}
+  .subtabs button.on{background:#002E5D;color:#fff;border-color:#002E5D}
+  .volwrap{display:flex;flex-wrap:wrap;gap:6px}
+  .volchip{display:flex;align-items:center;gap:6px;border:1px solid #e6e4dd;border-radius:20px;padding:4px 10px;font-size:11.5px;color:#545454}
+  .volchip b{font-weight:800;color:#1a1d2e}
+  .zleg{display:inline-block;border-radius:5px;padding:2px 6px;font-weight:700;font-size:10.5px}
+  table.malla{width:100%;border-collapse:separate;border-spacing:3px;table-layout:fixed;font-size:11.5px}
+  table.malla th{font-weight:700;color:#545454;padding:3px 2px;font-size:10.5px}
+  table.malla td{text-align:center}
+  table.malla .pat{text-align:left;font-weight:800;color:#1a1d2e;font-size:11.5px;white-space:nowrap;width:64px}
+  table.malla select{width:100%;border:1px solid #dee2e6;border-radius:6px;padding:5px 1px;font-size:11px;font-weight:700;text-align:center;text-align-last:center}
+  .dias{font-weight:800}
+  .rot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#FF6600;margin-left:3px;vertical-align:1px}
+  .lockbtn{border:1px solid #cdd6df;background:#fff;border-radius:6px;font-size:10px;padding:2px 5px;cursor:pointer;color:#545454;line-height:1.4}
+  .lockbtn.on{background:#fdecea;color:#c0392b;border-color:#f1c9c4}
+  .split2{display:flex;gap:10px;align-items:flex-start}
+  @media(max-width:680px){.split2{flex-direction:column}#malla-left{flex:none!important;width:100%}}
+  .volrow{display:flex;justify-content:space-between;align-items:center;border:1px solid #e6e4dd;border-radius:8px;padding:6px 8px;margin-bottom:4px;font-size:11.5px;color:#545454;cursor:pointer}
+  .comdet{display:flex;flex-direction:column;gap:3px;margin:-2px 0 6px;padding:6px;background:#faf9f5;border:1px solid #eee;border-radius:8px}
+  .comrow{display:flex;justify-content:space-between;font-size:10.5px;color:#545454;border:1px solid #eee;border-radius:6px;padding:2px 7px}
+  .comrow b{color:#1a1d2e}
+  .secrow td{font-weight:700;font-size:10.5px;padding:4px 6px;text-align:left;border-radius:6px}
+  .secrow.plt td{background:#e6efe9;color:#1a7a3c}
+  .secrow.bkp td{background:#f1efe8;color:#8A8780}
+  table.malla .pat.plt{border-left:3px solid #1a7a3c}
+  table.malla .pat.bkp{border-left:3px dashed #B4B2A9;color:#8A8780}
+  .ptipo{font-size:8.5px;color:#9aa0a6;font-weight:400}
+  .omod{font-size:8px;color:#c0392b;text-align:center;line-height:1.2;margin-top:1px}
 </style>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
-  <h1>Secuenciador de Ruta · <span>Rosen</span></h1>
-  <div class="sub">El supervisor sube la planificación; cada chofer ordena y cierra su ruta desde el celular; el supervisor descarga la planilla con la secuencia.</div>
+  <h1>Consola de Operaciones · <span>Rosen</span></h1>
+  <div class="sub">Supervisor: arma la secuencia de ruta y la malla de rotación semanal. Chofer: ordena su ruta desde el celular.</div>
 
   <div class="modebar">
     <button id="m-sup" class="on" onclick="setMode('sup')">👤 Supervisor</button>
@@ -73,19 +106,66 @@
       <div class="hint">El modo Chofer no necesita login. Solo el supervisor entra con clave.</div>
     </div>
     <div id="sup-tools" class="hidden">
-      <div style="text-align:right;margin-bottom:8px"><button class="btn bg" style="padding:5px 10px;font-size:12px" onclick="supLogout()">Cerrar sesión</button></div>
-      <div class="card">
-        <label>1 · Subí el Excel de planificación</label>
-        <input type="file" id="file" accept=".xlsx,.xls" onchange="subirExcel(event)">
-        <div class="hint">Lee la hoja “Rpt. HojasRutas”, agrupa por chofer y lo publica para que cada uno ordene su ruta. (Re-subir reemplaza la jornada.)</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><span style="font-size:12px;color:#545454">Sesión: <b id="rol-lbl" style="color:#002E5D"></b></span><button class="btn bg" style="padding:5px 10px;font-size:12px" onclick="supLogout()">Cerrar sesión</button></div>
+      <div class="subtabs">
+        <button id="st-b-seq" class="on" onclick="subTab('seq')">📋 Secuencia de ruta</button>
+        <button id="st-b-malla" onclick="subTab('malla')">🗓 Malla de rotación</button>
       </div>
-      <div class="card">
-        <label>2 · Estado de las rutas <button class="btn bg" style="float:right;padding:5px 10px;font-size:12px" onclick="cargarEstado()">↻ Actualizar</button></label>
-        <div id="estado"><div class="empty">Subí la planificación o tocá “Actualizar”.</div></div>
-        <div class="actions">
-          <button class="btn b2" onclick="descargar()">⬇ Descargar planilla + secuencia</button>
-          <button class="btn bg" onclick="limpiarJornada()">🗑 Limpiar jornada (nuevo día)</button>
+
+      <div id="st-seq">
+        <div class="card">
+          <label>1 · Subí el Excel de planificación</label>
+          <input type="file" id="file" accept=".xlsx,.xls" onchange="subirExcel(event)">
+          <div class="hint">Lee la hoja “Rpt. HojasRutas”, agrupa por chofer y lo publica para que cada uno ordene su ruta. (Re-subir reemplaza la jornada.)</div>
         </div>
+        <div class="card">
+          <label>2 · Estado de las rutas <button class="btn bg" style="float:right;padding:5px 10px;font-size:12px" onclick="cargarEstado()">↻ Actualizar</button></label>
+          <div id="estado"><div class="empty">Subí la planificación o tocá “Actualizar”.</div></div>
+          <div class="actions">
+            <button class="btn b2" onclick="descargar()">⬇ Descargar planilla + secuencia</button>
+            <button class="btn bg" onclick="limpiarJornada()">🗑 Limpiar jornada (nuevo día)</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="st-malla" class="hidden">
+        <div class="card">
+          <label>Operación y semana</label>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <select id="malla-op" onchange="loadMalla()" style="flex:1;min-width:150px">
+              <option value="">— elegí operación —</option>
+              <option value="rosen-vina">Rosen Viña</option>
+              <option value="canon-vina">Canon Viña</option>
+              <option value="canon-rm">Canon RM</option>
+              <option value="rosen-serena">Rosen Serena</option>
+              <option value="canon-serena">Canon Serena</option>
+            </select>
+            <input type="week" id="malla-week" onchange="loadMalla()" style="flex:1;min-width:150px">
+          </div>
+          <div id="malla-weeklbl" class="hint" style="margin-top:6px"></div>
+          <div class="actions">
+            <label class="btn b1" style="cursor:pointer">⬆ Pre-planilla<input type="file" id="malla-file" accept=".xlsx,.xls" onchange="subirPreplany(event)" style="display:none"></label>
+            <label class="btn bg" style="cursor:pointer">⚙ Maestro<input type="file" id="maestro-file" accept=".xlsx,.xls" onchange="subirMaestro(event)" style="display:none"></label>
+            <button class="btn bg" onclick="loadMalla()">↻ Actualizar información</button>
+            <button class="btn bok" onclick="saveMalla(true)">💾 Guardar</button>
+          </div>
+          <div class="hint">Elegí la operación (si no, la malla queda en blanco). La pre-planilla agrupa el volumen por zona; las patentes salen del Maestro (planta arriba, backup abajo). Mar/Vie: Interior · Mié/Sáb: Costa. Candado = cerrar/confirmar el día.</div>
+        </div>
+
+        <div id="malla-body" class="split2 hidden">
+          <div class="card" id="malla-left" style="flex:0 0 200px">
+            <label>Capacidades por zona <button class="btn bg" style="float:right;padding:3px 8px;font-size:10.5px" onclick="eliminarCarga()" title="Eliminar carga">🗑</button></label>
+            <div id="malla-fcarga" class="hint" style="margin-top:0;margin-bottom:6px"></div>
+            <div id="malla-vol"></div>
+            <div id="malla-sin" style="margin-top:8px"></div>
+          </div>
+          <div class="card" id="malla-right" style="flex:1;min-width:0">
+            <label>Malla semanal <button class="btn bg" style="float:right;padding:4px 9px;font-size:11px" onclick="vaciarMalla()">🗑 Vaciar</button></label>
+            <div id="malla-grid"></div>
+            <div class="hint">Punto naranja = baja rotación · candado = día cerrado · “orig” en una celda = lo proyectado antes de tu cambio.</div>
+          </div>
+        </div>
+        <div id="malla-empty" class="card"><div class="empty">Elegí una operación para ver su malla.</div></div>
       </div>
     </div>
   </div>
@@ -127,18 +207,24 @@ async function sbUpsert(rows){const r=await fetch(`${SB_URL}/rest/v1/${TABLE}`,{
 async function sbDelete(q){try{await fetch(`${SB_URL}/rest/v1/${TABLE}?${q}`,{method:'DELETE',headers:H});}catch(e){}}
 
 // ===== Acceso supervisor (bloqueo a nivel de interfaz; el modo Chofer queda abierto) =====
-let supAuth=false;
-const SUP_EMAIL='natalia.gonzalez@bigticket.cl', SUP_PASS='secuencia';
+let supAuth=false, ROL='';
+const CUENTAS=[
+  {email:'natalia.gonzalez@bigticket.cl',pass:'secuencia',rol:'sup'},
+  {email:'pablo.millon@bigticket.cl',pass:'planificacion',rol:'admin'}
+];
 function norm(s){return(s||'').toLowerCase().trim().normalize('NFD').replace(/[̀-ͯ]/g,'');}
+function esAdmin(){return ROL==='admin';}
 function supLogin(){
   const e=norm($('sup-email').value),p=($('sup-pass').value||'').trim();
-  if(e===SUP_EMAIL&&p===SUP_PASS){supAuth=true;try{sessionStorage.setItem('supAuth','1');}catch(_){}renderSup();}
+  const c=CUENTAS.find(x=>norm(x.email)===e&&x.pass===p);
+  if(c){supAuth=true;ROL=c.rol;try{sessionStorage.setItem('supAuth','1');sessionStorage.setItem('rol',c.rol);}catch(_){}renderSup();}
   else{const er=$('sup-err');er.style.display='block';er.textContent='Email o contraseña incorrectos.';}
 }
-function supLogout(){supAuth=false;try{sessionStorage.removeItem('supAuth');}catch(_){}renderSup();}
+function supLogout(){supAuth=false;ROL='';try{sessionStorage.removeItem('supAuth');sessionStorage.removeItem('rol');}catch(_){}renderSup();}
 function renderSup(){
   $('sup-login').classList.toggle('hidden',supAuth);
   $('sup-tools').classList.toggle('hidden',!supAuth);
+  const rl=$('rol-lbl');if(rl)rl.textContent=supAuth?(esAdmin()?'Administrador':'Supervisor'):'';
   if(supAuth)cargarEstado();
 }
 function setMode(m){
@@ -195,8 +281,10 @@ async function cargarEstado(){
   box.innerHTML=rows.sort((a,b)=>a.chofer.localeCompare(b.chofer)).map(r=>{
     const n=(r.data&&r.data.paradas)?r.data.paradas.length:0;
     const st=r.cerrada?'<span class="badge b-lock">🔒 Cerrada</span>':'<span class="badge b-open">Abierta</span>';
-    const re=r.cerrada?`<button class="btn bg" style="padding:4px 9px;font-size:11px;margin-left:8px" onclick="reabrir('${r.chofer.replace(/'/g,"")}')">Reabrir</button>`:'';
-    return `<div class="rstat"><span><b>${r.chofer}</b> · ${n} paradas</span><span>${st}${re}</span></div>`;
+    const ch=r.chofer.replace(/'/g,'');
+    const re=r.cerrada?`<button class="btn bg" style="padding:0 12px;height:30px;font-size:11px" onclick="reabrir('${ch}')">Reabrir</button>`:'';
+    const dl=`<button class="btn bg" style="width:32px;height:30px;padding:0;font-size:14px;display:inline-flex;align-items:center;justify-content:center" title="Descargar esta patente" onclick="descargarRuta('${ch}')">⬇</button>`;
+    return `<div class="rstat"><span class="rsl"><b>${r.chofer}</b> · ${n} paradas</span><span class="rsr">${st}${dl}${re}</span></div>`;
   }).join('');
 }
 async function reabrir(ch){
@@ -224,6 +312,19 @@ async function descargar(){
   const d=new Date();
   XLSX.writeFile(wb,'Secuencia_Rosen_'+d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')+'.xlsx');
   toast('Excel descargado: Patente, Orden, Secuencia');
+}
+// Descargar la secuencia de UNA patente (para bajarlas a medida que se cierran)
+async function descargarRuta(ch){
+  const rr=await sbGet(`jornada=eq.${JORNADA}&chofer=eq.${encodeURIComponent(ch)}&select=chofer,data`);
+  if(!rr||!rr.length){toast('No encontré la ruta',1);return;}
+  const seq=(rr[0].data&&rr[0].data.seq)||[];
+  if(!seq.length){toast('Esa patente aún no tiene secuencia',1);return;}
+  const aoa=[['Patente','Orden','Secuencia']];seq.forEach((orden,i)=>aoa.push([ch,orden,i+1]));
+  const ws=XLSX.utils.aoa_to_sheet(aoa),wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Secuencia');
+  const d=new Date();
+  XLSX.writeFile(wb,'Secuencia_'+ch.replace(/[^0-9A-Za-z]/g,'')+'_'+d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')+'.xlsx');
+  toast('Descargada secuencia de '+ch);
 }
 
 // ---------- CHOFER ----------
@@ -286,14 +387,20 @@ function renderMap(fit){                  // redibuja pines+línea según el ord
   if(!MAP)return;
   MAPLAYERS.forEach(l=>MAP.removeLayer(l));MAPLAYERS=[];
   const pts=items.map((it,i)=>{const la=parseFloat(it.lat),lo=parseFloat(it.lng);return{n:i+1,la,lo,it,ok:!isNaN(la)&&!isNaN(lo)&&(la||lo)};}).filter(p=>p.ok);
-  if(!pts.length)return;
-  const ll=[];
-  pts.forEach(p=>{
-    ll.push([p.la,p.lo]);
-    const cls='pin'+(p.n===1?' first':'')+(p.n===pts.length?' last':'');
-    const m=L.marker([p.la,p.lo],{icon:L.divIcon({className:'',html:'<div class="'+cls+'">'+p.n+'</div>',iconSize:[28,28],iconAnchor:[14,14]})}).addTo(MAP);
-    m.bindPopup('<b>#'+p.n+' · '+p.it.orden+'</b><br>'+(p.it.cliente||'')+'<br>'+(p.it.direccion||''));
-    MAPLAYERS.push(m);
+  if(!pts.length){if(MAP&&MAP.setView)MAP.setView([-32.5,-71.3],8);return;}   // ruta sin coordenadas: posiciona el mapa para que no quede gris
+  const ll=pts.map(p=>[p.la,p.lo]);
+  // Agrupar paradas en la MISMA dirección en un solo pin (para no perder números)
+  const grp={};pts.forEach(p=>{const k=p.la.toFixed(5)+','+p.lo.toFixed(5);(grp[k]=grp[k]||[]).push(p);});
+  Object.values(grp).forEach(g=>{
+    const f=g[0],multi=g.length>1,nums=g.map(p=>p.n),join=nums.join('·');
+    const label=multi?(join.length<=7?join:(nums[0]+'+'+(g.length-1))):String(f.n);
+    const cls='pin'+(multi?' multi':((f.n===1?' first':'')+(f.n===pts.length?' last':'')));
+    const sz=multi?36:28;
+    const m=L.marker([f.la,f.lo],{icon:L.divIcon({className:'',html:'<div class="'+cls+'">'+label+'</div>',iconSize:[sz,sz],iconAnchor:[sz/2,sz/2]})}).addTo(MAP);
+    const pop=multi
+      ?('<b>📍 '+g.length+' entregas en esta dirección</b><br>'+g.map(p=>'#'+p.n+' · '+p.it.orden+(p.it.cliente?(' · '+p.it.cliente):'')).join('<br>')+'<br>'+(f.it.direccion||''))
+      :('<b>#'+f.n+' · '+f.it.orden+'</b><br>'+(f.it.cliente||'')+'<br>'+(f.it.direccion||''));
+    m.bindPopup(pop);MAPLAYERS.push(m);
   });
   const pl=L.polyline(ll,{color:'#002E5D',weight:3,opacity:.55}).addTo(MAP);MAPLAYERS.push(pl);
   if(fit)MAP.fitBounds(ll,{padding:[30,30]});  // al reordenar NO re-encuadra (respeta su zoom)
@@ -313,7 +420,264 @@ async function cerrar(){
   const ok=await sbUpsert([{jornada:JORNADA,chofer:curChofer,data:{paradas:items,seq:items.map(p=>p.orden)},cerrada:true}]);
   if(ok){curCerrada=true;render();toast('Ruta cerrada 🔒');}
 }
-try{supAuth=sessionStorage.getItem('supAuth')==='1';}catch(_){}
+// ================= MALLA DE ROTACIÓN =================
+function subTab(t){
+  $('st-b-seq').classList.toggle('on',t==='seq');$('st-b-malla').classList.toggle('on',t==='malla');
+  $('st-seq').classList.toggle('hidden',t!=='seq');$('st-malla').classList.toggle('hidden',t!=='malla');
+  if(t==='malla')loadMaestro().then(loadMalla);
+}
+const DIAS=[['L','Lun'],['M','Mar'],['X','Mié'],['J','Jue'],['V','Vie'],['S','Sáb']];
+const MESC=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+const ZONAS={'rosen-vina':[['VN','Viña del Mar'],['QV','Quilpué/V.Alemana'],['VL','Valparaíso'],['CR','Concón/Reñaca'],['LO','Limache/Olmué'],['IN','Interior'],['CNR','Costa N. lejana'],['CNU','Costa N. cercano'],['STS','Serv. técnico'],['ES','Especial'],['N/D','No disp.'],['N/C','No citado']]};
+ZONAS['canon-vina']=ZONAS['rosen-vina'];
+ZONAS['canon-rm']=[['CEN','Centro'],['OTE','Oriente'],['SOR','Suroriente'],['SUR','Sur'],['NTE','Norte'],['NP','Norponiente'],['PON','Poniente'],['RUR','Rural'],['FR','Rural Frecuencia'],['STS','Serv. técnico'],['ES','Especial'],['N/D','No disp.'],['N/C','No citado']];
+ZONAS['rosen-serena']=[['US','Urbano Serena'],['UC','Urbano Coquimbo'],['VS','Valle Serena'],['OV','Ovalle'],['INC','Interior/Valle'],['AN','Andacollo'],['CC','Costa Coquimbo'],['STS','Serv. técnico'],['ES','Especial'],['N/D','No disp.'],['N/C','No citado']];
+ZONAS['canon-serena']=ZONAS['rosen-serena'];
+const ZCOLOR={VN:'#2F5277',QV:'#3E6B96',VL:'#5B6B7A',CR:'#4E8C8C',LO:'#6E8F5E',IN:'#D9B65C',CNR:'#B5705C',CNU:'#E0A36B',ES:'#8A7898','N/D':'#E3E1D9','N/C':'#F0EEE7',CEN:'#2F5277',OTE:'#5B6B7A',SOR:'#E0A36B',SUR:'#B5705C',NTE:'#4E8C8C',NP:'#3E6B96',PON:'#D9B65C',RUR:'#6E8F5E',FR:'#7E6A8A',US:'#2F5277',UC:'#4E8C8C',VS:'#6E8F5E',OV:'#3E6B96',INC:'#D9B65C',AN:'#8A7898',CC:'#B5705C',STS:'#9B5B6B',TDA:'#6E5B8A'};
+function zfg(z){return (z==='N/D'||z==='N/C')?'#8A8780':'#fff';}
+const COMUNA2ZONA={'VINA DEL MAR':'VN','VINA':'VN','QUILPUE':'QV','VILLA ALEMANA':'QV','EL BELLOTO':'QV','BELLOTO':'QV','VALPARAISO':'VL','CURAUMA':'VL','CONCON':'CR','RENACA':'CR','LIMACHE':'LO','OLMUE':'LO','QUILLOTA':'IN','LA CRUZ':'IN','LA CALERA':'IN','CALERA':'IN','NOGALES':'IN','HIJUELAS':'IN','EL MELON':'IN','MELON':'IN','LLAY LLAY':'IN','LLAYLLAY':'IN','CATEMU':'IN','PANQUEHUE':'IN','SAN FELIPE':'IN','PUTAENDO':'IN','SANTA MARIA':'IN','RINCONADA':'IN','CALLE LARGA':'IN','LOS ANDES':'IN','SAN ESTEBAN':'IN','QUILLOTA':'IN','LA CRUZ':'IN','LA LIGUA':'CNR','CABILDO':'CNR','PAPUDO':'CNR','ZAPALLAR':'CNR','PETORCA':'CNR','QUINTERO':'CNU','PUCHUNCAVI':'CNU','COQUIMBO':'UC','LA SERENA':'US','PAIGUANO':'VS','VICUNA':'VS','COMBARBALA':'INC','MONTE PATRIA':'INC','PUNITAQUI':'INC','RIO HURTADO':'INC','SOTAQUI':'INC','ANDACOLLO':'AN','GUANAQUEROS':'CC','LAS TACAS':'CC','PUERTO VELERO':'CC','TONGOY':'CC','TOTORALILLO':'CC','OVALLE':'OV','ESTACION CENTRAL':'CEN','PROVIDENCIA':'CEN','QUINTA NORMAL':'CEN','SAN JOAQUIN':'CEN','SAN MIGUEL':'CEN','SANTIAGO':'CEN','CERRO NAVIA':'NP','LO PRADO':'NP','PUDAHUEL':'NP','QUILICURA':'NP','RENCA':'NP','COLINA':'FR','LAMPA':'FR','CONCHALI':'NTE','HUECHURABA':'NTE','INDEPENDENCIA':'NTE','RECOLETA':'NTE','TILTIL':'RUR','ALHUE':'RUR','CURACAVI':'RUR','EL MONTE':'RUR','ISLA DE MAIPO':'RUR','MARIA PINTO':'RUR','MELIPILLA':'RUR','SAN PEDRO':'RUR','TALAGANTE':'RUR','CALERA DE TANGO':'RUR','PIRQUE':'RUR','SAN JOSE DE MAIPO':'RUR','LA REINA':'OTE','LAS CONDES':'OTE','LO BARNECHEA':'OTE','NUNOA':'OTE','VITACURA':'OTE','CERRILLOS':'PON','CERRILOS':'PON','MAIPU':'PON','PADRE HURTADO':'PON','PENAFLOR':'PON','EL BOSQUE':'SUR','LA GRANJA':'SUR','LO ESPEJO':'SUR','PEDRO AGUIRRE CERDA':'SUR','SAN BERNARDO':'SUR','BUIN':'SUR','LA CISTERNA':'SUR','LA PINTANA':'SUR','PAINE':'SUR','SAN RAMON':'SUR','LA FLORIDA':'SOR','MACUL':'SOR','PENALOLEN':'SOR','PUENTE ALTO':'SOR'};
+const ZREG={vina:new Set(['VN','QV','VL','CR','LO','IN','CNR','CNU']),serena:new Set(['US','UC','VS','OV','INC','AN','CC']),rm:new Set(['CEN','OTE','SOR','SUR','NTE','NP','PON','RUR','FR'])};
+function normC(s){return(s||'').toString().toUpperCase().trim().normalize('NFD').replace(/[̀-ͯ]/g,'');}
+function keyComuna(raw){return normC(raw).replace(/[.\-_/]/g,' ').replace(/\s+/g,' ').trim();}
+// #1 índice tolerante: cada comuna en 3 formas (normal / sin artículo / sin espacios)
+const COMUNA_IDX={};
+for(const k in COMUNA2ZONA){const z=COMUNA2ZONA[k];const ck=keyComuna(k);[ck,ck.replace(/^(LA|EL|LOS|LAS) /,''),ck.replace(/ /g,'')].forEach(v=>{if(v&&!COMUNA_IDX[v])COMUNA_IDX[v]=z;});}
+function matchZona(raw){const c=keyComuna(raw);if(!c)return null;const cand=[c,c.replace(/^(LA|EL|LOS|LAS) /,''),c.replace(/ /g,'')];for(const k of cand){if(COMUNA_IDX[k])return COMUNA_IDX[k];}return null;}
+function brandOf(op){return (op||'').indexOf('canon')===0?'canon':'rosen';}
+function opNombre(op){return {'rosen-vina':'Rosen Viña','canon-vina':'Canon Viña','canon-rm':'Canon RM','rosen-serena':'Rosen Serena','canon-serena':'Canon Serena'}[op]||op;}
+// Comunas por zona (para la nomenclatura/leyenda #8)
+const ZONACOM={VN:['Viña del Mar'],QV:['Quilpué','Villa Alemana','El Belloto'],VL:['Valparaíso','Curauma'],CR:['Concón','Reñaca'],LO:['Limache','Olmué'],IN:['Quillota','La Cruz','La Calera','Nogales','Hijuelas'],CNR:['La Ligua','Cabildo','Papudo','Zapallar','Petorca'],CNU:['Quintero','Puchuncaví'],US:['La Serena'],UC:['Coquimbo'],VS:['Paiguano','Vicuña'],OV:['Ovalle'],INC:['Combarbalá','Monte Patria','Punitaqui','Río Hurtado','Sotaquí'],AN:['Andacollo'],CC:['Guanaqueros','Las Tacas','Puerto Velero','Tongoy','Totoralillo'],CEN:['Santiago','Providencia','Estación Central','Quinta Normal','San Miguel','San Joaquín'],OTE:['Las Condes','Vitacura','Lo Barnechea','La Reina','Ñuñoa'],SOR:['Puente Alto','La Florida','Peñalolén','Macul'],SUR:['San Bernardo','La Pintana','El Bosque','La Cisterna','La Granja','San Ramón','Lo Espejo','P.A. Cerda','Buin','Paine'],NTE:['Recoleta','Independencia','Conchalí','Huechuraba'],NP:['Quilicura','Renca','Pudahuel','Cerro Navia','Lo Prado'],PON:['Maipú','Cerrillos','Padre Hurtado','Peñaflor'],RUR:['Melipilla','Talagante','Isla de Maipo','El Monte','Curacaví','Calera de Tango','Pirque','San José de Maipo','Tiltil','Alhué','María Pinto','San Pedro'],FR:['Colina','Lampa'],STS:['Servicio técnico']};
+// Frecuencia: días en que sale cada zona (#10). Default = todos. Config por operación.
+let FREQ={},volView='vol';
+async function loadFreq(){const r=await sbGet(`jornada=eq.${encodeURIComponent('freq:'+MALLA.op)}&chofer=eq.__FREQ__&select=data`);FREQ=(r&&r.length&&r[0].data)?r[0].data:{};}
+async function saveFreq(){await sbUpsert([{jornada:'freq:'+MALLA.op,chofer:'__FREQ__',data:FREQ,cerrada:false}]);}
+function zonaDias(z){return FREQ[z]||{L:1,M:1,X:1,J:1,V:1,S:1};}
+function toggleDia(z,k){if(!esAdmin()){toast('Solo el administrador puede cambiar la frecuencia',1);return;}const f=Object.assign({L:1,M:1,X:1,J:1,V:1,S:1},FREQ[z]||{});f[k]=f[k]?0:1;FREQ[z]=f;saveFreq();renderVol();}
+function setVolView(v){volView=v;renderVol();}
+
+// ---- Maestro de patentes (#5/#6) ----
+const OPMAP={'C_RM':'canon-rm','C_VINA':'canon-vina','R_VINA':'rosen-vina','R_SERENA':'rosen-serena','C_SERENA':'canon-serena'};
+let MAESTRO={pat:[]};
+async function loadMaestro(){
+  const rows=await sbGet(`jornada=eq.maestro&chofer=eq.__BASE__&select=data`);
+  MAESTRO=(rows&&rows.length&&rows[0].data&&rows[0].data.pat)?rows[0].data:{pat:[]};
+}
+function subirMaestro(e){
+  const f=e.target.files[0];if(!f)return;const rd=new FileReader();
+  rd.onload=async ev=>{
+    try{
+      const wb=XLSX.read(ev.target.result,{type:'binary'});
+      const ws=wb.Sheets['Base datos']||wb.Sheets[wb.SheetNames[0]];
+      const d=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+      const head=d[0].map(x=>normC(x));
+      const f2=(...n)=>{for(const x of n){const nx=normC(x);const i=head.findIndex(h=>h===nx||h.includes(nx));if(i>=0)return i;}return -1;};
+      const iP=f2('patente'),iT=f2('tipo'),iOp=f2('operacion'),iU=f2('uso');
+      const pat=[];
+      d.slice(1).forEach(r=>{if(!r||!String(r[iP]||'').trim())return;const code=normC(r[iOp]).replace(/\s/g,'');const node=OPMAP[code]||'';const uso=/BACK/.test(normC(r[iU]))?'backup':'planta';pat.push({pat:String(r[iP]).trim().toUpperCase(),tipo:String(iT>=0?r[iT]:'').trim(),op:node,uso});});
+      MAESTRO={pat};
+      await sbUpsert([{jornada:'maestro',chofer:'__BASE__',data:MAESTRO,cerrada:false}]);
+      toast('Maestro cargado: '+pat.length+' patentes');renderGrid();
+    }catch(err){toast('Error Maestro: '+err.message,1);}
+    e.target.value='';
+  };
+  rd.readAsBinaryString(f);
+}
+function patentesDeNodo(op){
+  const seen={};
+  MAESTRO.pat.filter(p=>p.op===op).forEach(p=>{if(seen[p.pat]){if(p.uso==='planta')seen[p.pat].uso='planta';}else seen[p.pat]={pat:p.pat,tipo:p.tipo,uso:p.uso};});
+  const planta=[],backup=[];
+  Object.keys(seen).sort().forEach(k=>{(seen[k].uso==='planta'?planta:backup).push(seen[k]);});
+  return {planta,backup};
+}
+
+// ---- Semana (#7) ----
+function isoWeekKey(d){const dt=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));const day=dt.getUTCDay()||7;dt.setUTCDate(dt.getUTCDate()+4-day);const ys=new Date(Date.UTC(dt.getUTCFullYear(),0,1));const wk=Math.ceil((((dt-ys)/86400000)+1)/7);return dt.getUTCFullYear()+'-W'+String(wk).padStart(2,'0');}
+function weekMonday(wk){const m=/(\d{4})-W(\d{2})/.exec(wk||'');if(!m)return null;const y=+m[1],w=+m[2];const jan4=new Date(Date.UTC(y,0,4));const day=jan4.getUTCDay()||7;const w1=new Date(jan4);w1.setUTCDate(jan4.getUTCDate()-day+1);const mon=new Date(w1);mon.setUTCDate(w1.getUTCDate()+(w-1)*7);return mon;}
+function weekDates(wk){const mon=weekMonday(wk);if(!mon)return null;const a=[];for(let i=0;i<6;i++){const x=new Date(mon);x.setUTCDate(mon.getUTCDate()+i);a.push(x);}return a;}
+function renderWeekLbl(){const ds=weekDates(MALLA.week);if(!ds){$('malla-weeklbl').textContent='';return;}const a=ds[0],b=ds[5];$('malla-weeklbl').textContent='📅 Semana '+a.getUTCDate()+'–'+b.getUTCDate()+' '+MESC[b.getUTCMonth()]+' '+b.getUTCFullYear();}
+
+// ---- Estado + persistencia (por operación + semana) ----
+let MALLA={op:'',week:'',asign:{},orig:{},lock:{},vol:{},volg:{},comdet:{},sinzona:{},fcarga:'',patManual:[],totOrd:0};
+let zonaExp=null;
+function mallaKey(){return 'malla:'+MALLA.op+':'+MALLA.week;}
+async function loadMalla(){
+  MALLA.op=$('malla-op').value;
+  if(!$('malla-week').value)$('malla-week').value=isoWeekKey(new Date());
+  MALLA.week=$('malla-week').value;
+  const body=$('malla-body'),empty=$('malla-empty');
+  if(!MALLA.op){body.classList.add('hidden');empty.classList.remove('hidden');return;}   // #3 blanco hasta elegir nodo
+  body.classList.remove('hidden');empty.classList.add('hidden');
+  volView='vol';await loadFreq();
+  const rows=await sbGet(`jornada=eq.${encodeURIComponent(mallaKey())}&chofer=eq.__MALLA__&select=data`);
+  const d=(rows&&rows.length&&rows[0].data)?rows[0].data:{};
+  MALLA.asign=d.asign||{};MALLA.orig=d.orig||{};MALLA.lock=d.lock||{};MALLA.vol=d.vol||{};MALLA.volg=d.volg||{};MALLA.comdet=d.comdet||{};MALLA.sinzona=d.sinzona||{};MALLA.fcarga=d.fcarga||'';MALLA.patManual=d.patManual||[];MALLA.totOrd=d.totOrd||0;
+  zonaExp=null;renderWeekLbl();renderVol();renderGrid();
+}
+async function saveMalla(notify){
+  if(!MALLA.op)return false;
+  const ok=await sbUpsert([{jornada:mallaKey(),chofer:'__MALLA__',data:{asign:MALLA.asign,orig:MALLA.orig,lock:MALLA.lock,vol:MALLA.vol,volg:MALLA.volg,comdet:MALLA.comdet,sinzona:MALLA.sinzona,fcarga:MALLA.fcarga,patManual:MALLA.patManual},cerrada:false}]);
+  if(ok&&notify)toast('Malla guardada ✓');
+  return ok;
+}
+function subirPreplany(e){
+  if(!MALLA.op){toast('Primero elegí una operación',1);e.target.value='';return;}
+  const f=e.target.files[0];if(!f)return;const rd=new FileReader();
+  rd.onload=async ev=>{
+    try{
+      const wb=XLSX.read(ev.target.result,{type:'binary'});
+      let ws=null;for(const s of ['Rpt. HojasRutas','Formato por defecto lastmile']){if(wb.Sheets[s]){ws=wb.Sheets[s];break;}}if(!ws)ws=wb.Sheets[wb.SheetNames[0]];
+      const d=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+      const head=d[0].map(x=>String(x).trim().toLowerCase());
+      const find=(...n)=>{for(const x of n){const i=head.findIndex(h=>h===x||h.includes(x));if(i>=0)return i;}return -1;};
+      const iCom=find('comuna'),iVol=find('volumen','volúmen','m3'),iDir=find('direccion','dirección'),iGeo=find('geocerca'),iO=find('nro.f12','numero guia','guia','orden');
+      const iTipo=find('tipo de ruta','tipo'),iDesc=find('descripción','descripcion'),iTienda=find('tienda'),iSrv=find('servicio'),iCant=find('cantidad ruta','cantidad'),iCentro=find('centro');
+      // Un archivo Rosen puede traer Viña Y Serena juntas (+ SSTT). Separamos por región.
+      const reg={vina:{vol:{},volg:{},comdet:{},sinz:{},ord:new Set()},serena:{vol:{},volg:{},comdet:{},sinz:{},ord:new Set()},rm:{vol:{},volg:{},comdet:{},sinz:{},ord:new Set()}};
+      const seen={},seenC={};let nv=0,ns=0,nr=0;
+      const parsed=[];
+      d.slice(1).forEach(r=>{
+        if(!r||(iO>=0&&!String(r[iO]||'').trim()))return;
+        let comuna='';
+        if(iCom>=0&&String(r[iCom]||'').trim())comuna=String(r[iCom]).trim();
+        else if(iDir>=0&&String(r[iDir]||'').includes(','))comuna=String(r[iDir]).split(',').pop().trim();
+        const zbase=matchZona(comuna);
+        const region=ZREG.vina.has(zbase)?'vina':(ZREG.serena.has(zbase)?'serena':(ZREG.rm.has(zbase)?'rm':null));
+        if(region==='vina')nv++;else if(region==='serena')ns++;else if(region==='rm')nr++;
+        const stsTxt=[iTipo,iDesc,iSrv,iCentro].filter(x=>x>=0).map(x=>normC(r[x])).join(' ');
+        const isSTS=/\bSTS\b|\bSSTT\b|SERVICIO TECNIC|SERV TECNIC/.test(stsTxt);
+        const o=iO>=0?String(r[iO]).trim():String(Math.random());
+        const oU=o.toUpperCase();const retiro=oU.startsWith('006')||/_REC$/.test(oU);   // retiro/reciclaje → m³ 0
+        const cantL=parseFloat(String(iCant>=0?r[iCant]:'1').replace(',','.'))||1;
+        const volBase=parseFloat(String(iVol>=0?r[iVol]:'0').replace(',','.'))||0;
+        const sofa=(iDesc>=0&&normC(r[iDesc]).includes('SOFA'))?cantL:0;                // sofá: +1 m³ por unidad
+        const v=retiro?0:(volBase+sofa)/cantL;                                          // dividido por cantidad = m³ real
+        parsed.push({comuna,zbase,region,isSTS,v,o});
+      });
+      const majority=(nr>=nv&&nr>=ns&&nr>0)?'rm':(ns>nv?'serena':'vina');
+      parsed.forEach(p=>{
+        const R=p.region||majority;const B=reg[R];B.ord.add(p.o);
+        let z=p.isSTS?'STS':p.zbase;
+        if(z){
+          B.vol[z]=(B.vol[z]||0)+p.v;const gk=R+'|'+z+'|'+p.o;if(!seen[gk]){seen[gk]=1;B.volg[z]=(B.volg[z]||0)+1;}
+          if(z!=='STS'&&p.comuna){const cc=keyComuna(p.comuna);B.comdet[z]=B.comdet[z]||{};B.comdet[z][cc]=B.comdet[z][cc]||{vol:0,g:0};B.comdet[z][cc].vol+=p.v;const ck=R+'|'+z+'|'+cc+'|'+p.o;if(!seenC[ck]){seenC[ck]=1;B.comdet[z][cc].g++;}}
+        } else if(p.comuna){const cn=keyComuna(p.comuna);B.sinz[cn]=B.sinz[cn]||{vol:0,g:0};B.sinz[cn].vol+=p.v;const ck=R+'|S|'+cn+'|'+p.o;if(!seenC[ck]){seenC[ck]=1;B.sinz[cn].g++;}}
+      });
+      const fcarga=new Date().toLocaleString('es-CL',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+      const brand='rosen';const resumen=[];   // solo Rosen sube pre-planilla; Canon no
+      for(const region of ['vina','serena','rm']){
+        const B=reg[region];if(!Object.keys(B.vol).length&&!Object.keys(B.sinz).length)continue;
+        const op=brand+'-'+region;if(!ZONAS[op])continue;
+        const key='malla:'+op+':'+MALLA.week;
+        const rr=await sbGet(`jornada=eq.${encodeURIComponent(key)}&chofer=eq.__MALLA__&select=data`);
+        const dd=(rr&&rr.length&&rr[0].data)?rr[0].data:{};
+        dd.vol=B.vol;dd.volg=B.volg;dd.comdet=B.comdet;dd.sinzona=B.sinz;dd.fcarga=fcarga;dd.totOrd=B.ord.size;
+        dd.asign=dd.asign||{};dd.orig=dd.orig||{};dd.lock=dd.lock||{};dd.patManual=dd.patManual||[];
+        await sbUpsert([{jornada:key,chofer:'__MALLA__',data:dd,cerrada:false}]);
+        resumen.push(opNombre(op)+' ('+Object.keys(B.vol).length+' zonas)');
+      }
+      const curReg=MALLA.op.indexOf('serena')>=0?'serena':(MALLA.op.indexOf('rm')>=0?'rm':'vina');
+      const showReg=Object.keys(reg[curReg].vol).length?curReg:majority;
+      $('malla-op').value=brand+'-'+showReg;
+      await loadMalla();
+      const totAll=new Set(parsed.map(p=>p.o)).size;
+      toast(resumen.length?('✓ Cargado: '+resumen.join(' · ')+' · '+totAll+' órdenes'):'No reconocí comunas en el archivo',resumen.length?0:1);
+    }catch(err){toast('Error: '+err.message,1);}
+    e.target.value='';
+  };
+  rd.readAsBinaryString(f);
+}
+function renderVol(){
+  const isCanon=(MALLA.op||'').indexOf('canon')===0;   // Canon: nunca pre-planilla, solo frecuencia de zonas
+  $('malla-fcarga').textContent=(!isCanon&&MALLA.fcarga)?('Pre-planilla: '+MALLA.fcarga+(MALLA.totOrd?(' · '+MALLA.totOrd+' órdenes'):'')):'';
+  const hasVol=!isCanon&&Object.keys(MALLA.vol).length;
+  const view=hasVol?volView:'zonas';
+  const box=$('malla-vol'),sb=$('malla-sin');
+  const toggle=hasVol?`<div style="display:flex;gap:4px;margin-bottom:7px"><button class="btn ${view==='vol'?'b1':'bg'}" style="flex:1;padding:4px;font-size:10.5px" onclick="setVolView('vol')">Volumen</button><button class="btn ${view==='zonas'?'b1':'bg'}" style="flex:1;padding:4px;font-size:10.5px" onclick="setVolView('zonas')">Zonas</button></div>`:'';
+  if(view==='zonas'){box.innerHTML=toggle+renderLegend();sb.innerHTML='';return;}
+  const ks=Object.keys(MALLA.vol);ks.sort((a,b)=>MALLA.vol[b]-MALLA.vol[a]);
+  const totM3=ks.reduce((s,z)=>s+(MALLA.vol[z]||0),0),totG=ks.reduce((s,z)=>s+(MALLA.volg[z]||0),0);
+  const totRow=`<div class="volrow" style="background:#EEF2F6;border-color:#cdd6df;cursor:default;font-weight:700"><span><b>TOTAL</b></span><span><b>${totM3.toFixed(1)} m³</b> · ${totG} g</span></div>`;
+  box.innerHTML=toggle+totRow+ks.map(z=>{
+    const known=!!ZCOLOR[z];const c=known?ZCOLOR[z]:'#B4B2A9';
+    const cd=MALLA.comdet[z];const hasDet=cd&&Object.keys(cd).length;
+    let h=`<div class="volrow" onclick="toggleZona('${z}')"><span><span class="zleg" style="background:${c};color:${zfg(z)}">${z}</span> <b>${MALLA.vol[z].toFixed(1)} m³</b></span><span>${MALLA.volg[z]||0}${hasDet?(' '+(zonaExp===z?'▴':'▾')):''}</span></div>`;
+    if(hasDet&&zonaExp===z){const cks=Object.keys(cd).sort((a,b)=>cd[b].vol-cd[a].vol);h+='<div class="comdet">'+cks.map(cc=>`<span class="comrow"><span>${cc}</span><b>${cd[cc].vol.toFixed(1)}·${cd[cc].g}</b></span>`).join('')+'</div>';}
+    return h;
+  }).join('');
+  const sz=MALLA.sinzona||{};const sk=Object.keys(sz);
+  sb.innerHTML=sk.length?('<div style="font-size:11px;color:#c0392b;font-weight:700;margin-bottom:4px">⚠ Sin identificar ('+sk.length+')</div>'+sk.sort((a,b)=>sz[b].vol-sz[a].vol).map(c=>`<span class="comrow" style="border-color:#f1c9c4"><span>${c}</span><b>${sz[c].vol.toFixed(1)}·${sz[c].g}</b></span>`).join('')):'';
+}
+function renderLegend(){
+  const zs=(ZONAS[MALLA.op]||[]).filter(([z])=>ZONACOM[z]&&z!=='STS');
+  if(!zs.length)return '<div class="empty" style="font-size:11px;padding:8px">Sin zonas.</div>';
+  return '<div style="font-size:10px;color:#8A8780;margin-bottom:5px">'+(esAdmin()?'Tocá los días para marcar cuándo sale cada zona.':'Frecuencia (solo el administrador puede cambiarla).')+'</div>'+zs.map(([z,nm])=>{
+    const c=ZCOLOR[z]||'#888';const dias=zonaDias(z);
+    const strip=DIAS.map(([k])=>`<span onclick="toggleDia('${z}','${k}')" style="cursor:pointer;flex:1;text-align:center;font-size:9px;font-weight:700;padding:3px 0;border-radius:4px;background:${dias[k]?c:'#eee'};color:${dias[k]?zfg(z):'#b8b3a3'}">${k}</span>`).join('');
+    return `<div style="border:0.5px solid #eee;border-radius:8px;padding:6px;margin-bottom:5px"><div><span class="zleg" style="background:${c};color:${zfg(z)}">${z}</span> <b style="font-size:10.5px">${nm}</b></div><div style="font-size:9px;color:#8A8780;margin:2px 0 4px">${ZONACOM[z].join(', ')}</div><div style="display:flex;gap:3px">${strip}</div></div>`;
+  }).join('');
+}
+function toggleZona(z){zonaExp=(zonaExp===z?null:z);renderVol();}
+function renderGrid(){
+  const op=MALLA.op,zonas=ZONAS[op]||[];
+  const pn=patentesDeNodo(op);
+  const manual=(MALLA.patManual||[]).filter(p=>!pn.planta.some(x=>x.pat===p)&&!pn.backup.some(x=>x.pat===p)).map(p=>({pat:p,tipo:'',uso:'manual'}));
+  const ds=weekDates(MALLA.week);
+  if(!pn.planta.length&&!pn.backup.length&&!manual.length){$('malla-grid').innerHTML='<div class="empty">Sin patentes. Subí el Maestro (⚙) o agregá con “+ patente”.</div>'+addBtn();return;}
+  let head='<tr><th class="pat">Patente</th>';
+  DIAS.forEach(([k,lbl],i)=>{const lk=MALLA.lock[k];const dn=ds?(' '+ds[i].getUTCDate()):'';head+=`<th>${lbl}${dn}<br><button class="lockbtn${lk?' on':''}" onclick="toggleLock('${k}')">${lk?'🔒':'🔓'}</button></th>`;});
+  head+='<th>Días</th><th></th></tr>';
+  function rowsHtml(list,cls){
+    return list.map(p=>{
+      const pat=p.pat,row=MALLA.asign[pat]||{},orow=MALLA.orig[pat]||{};
+      let dias=0;const zs=[];DIAS.forEach(([k])=>{const z=row[k]||'';if(z&&z!=='N/D'&&z!=='N/C'){dias++;zs.push(z);}});
+      const low=dias>=5&&new Set(zs).size===1;
+      let tds=`<td class="pat ${cls}">${pat}${low?'<span class="rot" title="Baja rotación"></span>':''}${p.tipo?`<div class="ptipo">${p.tipo}</div>`:''}</td>`;
+      DIAS.forEach(([k])=>{
+        const z=row[k]||'',o=orow[k]||'',lk=MALLA.lock[k];
+        const opts='<option value="">·</option>'+zonas.map(([zc])=>`<option value="${zc}"${zc===z?' selected':''}>${zc}</option>`).join('');
+        const c=z?(ZCOLOR[z]||'#888'):'#fff',fg=z?zfg(z):'#1a1d2e';
+        const diff=(o&&o!==z)?`<div class="omod" title="Original: ${o}">orig ${o}</div>`:'';
+        tds+=`<td><select onchange="setCell('${pat}','${k}',this.value)" ${lk?'disabled':''} style="background:${c};color:${fg}">${opts}</select>${diff}</td>`;
+      });
+      const dc=dias===6?'#1a7a3c':dias===0?'#adb5bd':'#002E5D';
+      tds+=`<td class="dias" style="color:${dc}">${dias}</td><td><button class="lockbtn" onclick="delPatente('${pat}')" title="Quitar">✕</button></td>`;
+      return '<tr>'+tds+'</tr>';
+    }).join('');
+  }
+  let html='<table class="malla"><thead>'+head+'</thead><tbody>';
+  if(pn.planta.length)html+='<tr class="secrow plt"><td colspan="9">● PLANTA · prioritarias</td></tr>'+rowsHtml(pn.planta,'plt');
+  if(pn.backup.length)html+='<tr class="secrow bkp"><td colspan="9">○ BACK UP</td></tr>'+rowsHtml(pn.backup,'bkp');
+  if(manual.length)html+='<tr class="secrow"><td colspan="9">+ Agregadas manual</td></tr>'+rowsHtml(manual,'');
+  html+='</tbody></table>'+addBtn();
+  $('malla-grid').innerHTML=html;
+}
+function addBtn(){return '<div style="margin-top:8px"><button class="btn bg" style="padding:4px 9px;font-size:11px" onclick="addPatente()">+ patente</button></div>';}
+function setCell(p,k,v){
+  if(!MALLA.asign[p])MALLA.asign[p]={};
+  const prev=MALLA.asign[p][k]||'';
+  if(prev&&prev!==v){if(!MALLA.orig[p])MALLA.orig[p]={};if(!MALLA.orig[p][k])MALLA.orig[p][k]=prev;} // #4 guarda el original al modificar
+  MALLA.asign[p][k]=v;
+  if(MALLA.orig[p]&&MALLA.orig[p][k]===v){delete MALLA.orig[p][k];} // si vuelve al original, limpia el diff
+  renderGrid();saveMalla();
+}
+function toggleLock(k){MALLA.lock[k]=!MALLA.lock[k];renderGrid();saveMalla();}
+function addPatente(){const p=(prompt('Patente nueva:')||'').toUpperCase().trim();if(!p)return;MALLA.patManual=MALLA.patManual||[];if(MALLA.patManual.includes(p)){toast('Ya está',1);return;}MALLA.patManual.push(p);renderGrid();saveMalla();}
+function delPatente(pat){
+  if((MALLA.patManual||[]).includes(pat)){if(!confirm('¿Quitar patente '+pat+'?'))return;MALLA.patManual=MALLA.patManual.filter(x=>x!==pat);}
+  else{if(!confirm('Vaciar asignaciones de '+pat+'? (viene del Maestro, no se elimina de la flota)'))return;}
+  delete MALLA.asign[pat];delete MALLA.orig[pat];renderGrid();saveMalla();
+}
+function eliminarCarga(){
+  if(!Object.keys(MALLA.vol).length){toast('No hay carga para eliminar',1);return;}
+  if(!confirm('¿Eliminar la pre-planilla cargada (volumen)? La malla de asignación NO se toca.'))return;
+  MALLA.vol={};MALLA.volg={};MALLA.comdet={};MALLA.sinzona={};MALLA.fcarga='';zonaExp=null;renderVol();saveMalla();toast('Carga eliminada');
+}
+function vaciarMalla(){
+  if(!confirm('¿Vaciar TODA la malla (asignaciones)? Las patentes quedan.'))return;
+  MALLA.asign={};MALLA.orig={};MALLA.lock={};renderGrid();saveMalla();toast('Malla vaciada');
+}
+
+try{supAuth=sessionStorage.getItem('supAuth')==='1';ROL=sessionStorage.getItem('rol')||'';}catch(_){}
 renderSup();
 </script>
 </body>
