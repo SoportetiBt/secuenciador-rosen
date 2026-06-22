@@ -116,13 +116,16 @@
         <div class="card">
           <label>1 · Subí el Excel de planificación</label>
           <input type="file" id="file" accept=".xlsx,.xls" onchange="subirExcel(event)">
-          <div class="hint">Lee la hoja “Rpt. HojasRutas”, agrupa por chofer y lo publica para que cada uno ordene su ruta. (Re-subir reemplaza la jornada.)</div>
+          <div class="hint">Lee la hoja “Rpt. HojasRutas”, agrupa por patente y la publica. Podés subir <b>varios archivos</b> (ej. Rosen V y Rosen IV): se <b>suman</b>. Usá “Limpiar jornada” para empezar de cero.</div>
         </div>
         <div class="card">
           <label>2 · Estado de las rutas <button class="btn bg" style="float:right;padding:5px 10px;font-size:12px" onclick="cargarEstado()">↻ Actualizar</button></label>
+          <div id="lote-filtro-wrap" style="display:none;margin:0 0 10px">
+            <select id="lote-filtro" onchange="renderEstado()" style="width:100%"></select>
+          </div>
           <div id="estado"><div class="empty">Subí la planificación o tocá “Actualizar”.</div></div>
           <div class="actions">
-            <button class="btn b2" onclick="descargar()">⬇ Descargar planilla + secuencia</button>
+            <button class="btn b2" onclick="descargar()">⬇ Descargar secuencia<span id="dl-lote-lbl"></span></button>
             <button class="btn bg" onclick="limpiarJornada()">🗑 Limpiar jornada (nuevo día)</button>
           </div>
         </div>
@@ -260,25 +263,47 @@ function subirExcel(e){
         const lat=iLat>=0?String(r[iLat]||'').trim():'', lng=iLng>=0?String(r[iLng]||'').trim():'';
         (byCh[chofer]=byCh[chofer]||[]).push({orden,cliente:String(iC>=0?r[iC]:'').trim(),direccion:dir,lat,lng});
       });
+      const lote=(f.name||'').replace(/\.[^.]+$/,'').replace(/[_]+/g,' ').trim()||'Sin nombre'; // etiqueta = nombre del archivo (ej. "Rosen V")
       const rows=[];
       // fila especial con la planilla original completa (para reexportar)
       rows.push({jornada:JORNADA,chofer:'__PLANILLA__',data:{head,filas,iO,iCh},cerrada:false});
-      Object.keys(byCh).forEach(ch=>rows.push({jornada:JORNADA,chofer:ch,data:{paradas:byCh[ch],seq:byCh[ch].map(p=>p.orden)},cerrada:false}));
-      await sbDelete('jornada=eq.'+JORNADA); // limpia la jornada anterior para no mezclar rutas viejas
-      const ok=await sbUpsert(rows);
-      if(ok){toast('Publicado: '+Object.keys(byCh).length+' rutas. Los choferes ya pueden ordenar.');cargarEstado();}
+      Object.keys(byCh).forEach(ch=>rows.push({jornada:JORNADA,chofer:ch,data:{paradas:byCh[ch],seq:byCh[ch].map(p=>p.orden),lote},cerrada:false}));
+      const ok=await sbUpsert(rows);   // se AGREGAN/actualizan (no borra lo ya publicado): permite subir Rosen V y Rosen IV en archivos distintos
+      if(ok){toast('Publicado: +'+Object.keys(byCh).length+' rutas (se suman a las ya cargadas).');cargarEstado();}
     }catch(err){toast('Error: '+err.message,1);}
+    finally{e.target.value='';}  // permite volver a elegir archivo (incluso el mismo) y subir varios seguidos
   };
   rd.readAsBinaryString(f);
 }
 
 // ---------- SUPERVISOR: estado + reabrir ----------
+let _estadoRows=[]; // cache para filtrar por lote sin re-consultar
+function loteDe(r){return (r.data&&r.data.lote)||'(sin lote)';}
 async function cargarEstado(){
   const rows=await sbGet(`jornada=eq.${JORNADA}&select=chofer,cerrada,data&chofer=neq.__PLANILLA__`);
-  const box=$('estado');
   if(!rows){return;}
-  if(!rows.length){box.innerHTML='<div class="empty">Aún no hay rutas publicadas. Subí la planificación.</div>';return;}
-  box.innerHTML=rows.sort((a,b)=>a.chofer.localeCompare(b.chofer)).map(r=>{
+  _estadoRows=rows;
+  // armar el filtro de lotes/regiones
+  const lotes=[...new Set(rows.map(loteDe))].sort((a,b)=>a.localeCompare(b));
+  const wrap=$('lote-filtro-wrap'),sel=$('lote-filtro');
+  if(lotes.length>1){
+    const prev=sel.value;
+    sel.innerHTML='<option value="">Todos los lotes ('+rows.length+' patentes)</option>'+
+      lotes.map(l=>`<option value="${l.replace(/"/g,'')}">${l} · ${rows.filter(r=>loteDe(r)===l).length} patentes</option>`).join('');
+    if(prev&&lotes.includes(prev))sel.value=prev;
+    wrap.style.display='';
+  }else{wrap.style.display='none';sel.innerHTML='';}
+  renderEstado();
+}
+function renderEstado(){
+  const box=$('estado');
+  const rows=_estadoRows||[];
+  if(!rows.length){box.innerHTML='<div class="empty">Aún no hay rutas publicadas. Subí la planificación.</div>';$('dl-lote-lbl').textContent='';return;}
+  const f=($('lote-filtro')&&$('lote-filtro').value)||'';
+  $('dl-lote-lbl').textContent=f?' ('+f+')':'';
+  const vis=f?rows.filter(r=>loteDe(r)===f):rows;
+  if(!vis.length){box.innerHTML='<div class="empty">No hay patentes en ese lote.</div>';return;}
+  box.innerHTML=vis.slice().sort((a,b)=>a.chofer.localeCompare(b.chofer)).map(r=>{
     const n=(r.data&&r.data.paradas)?r.data.paradas.length:0;
     const st=r.cerrada?'<span class="badge b-lock">🔒 Cerrada</span>':'<span class="badge b-open">Abierta</span>';
     const ch=r.chofer.replace(/'/g,'');
@@ -301,8 +326,11 @@ async function limpiarJornada(){
 async function descargar(){
   const all=await sbGet(`jornada=eq.${JORNADA}&select=chofer,data&chofer=neq.__PLANILLA__`);
   if(!all||!all.length){toast('No hay datos para descargar',1);return;}
+  const f=($('lote-filtro')&&$('lote-filtro').value)||'';   // si hay lote elegido, baja solo ese
+  const sel=f?all.filter(r=>loteDe(r)===f):all;
+  if(!sel.length){toast('No hay patentes en ese lote',1);return;}
   const aoa=[['Patente','Orden','Secuencia']];
-  all.sort((a,b)=>a.chofer.localeCompare(b.chofer)).forEach(r=>{
+  sel.sort((a,b)=>a.chofer.localeCompare(b.chofer)).forEach(r=>{
     const seq=(r.data&&r.data.seq)||[];
     seq.forEach((orden,i)=>aoa.push([r.chofer,orden,i+1]));
   });
@@ -310,8 +338,9 @@ async function descargar(){
   const ws=XLSX.utils.aoa_to_sheet(aoa),wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,ws,'Secuencia');
   const d=new Date();
-  XLSX.writeFile(wb,'Secuencia_Rosen_'+d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')+'.xlsx');
-  toast('Excel descargado: Patente, Orden, Secuencia');
+  const tag=f?'_'+f.replace(/[^0-9A-Za-z]+/g,'-').replace(/^-|-$/g,''):'';
+  XLSX.writeFile(wb,'Secuencia_Rosen'+tag+'_'+d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')+'.xlsx');
+  toast(f?('Descargado lote: '+f):'Excel descargado: Patente, Orden, Secuencia');
 }
 // Descargar la secuencia de UNA patente (para bajarlas a medida que se cierran)
 async function descargarRuta(ch){
