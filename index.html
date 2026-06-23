@@ -114,16 +114,16 @@
 
       <div id="st-seq">
         <div class="card">
-          <label>1 · Subí el Excel de planificación</label>
+          <label>1 · Sube el Excel de planificación</label>
           <input type="file" id="file" accept=".xlsx,.xls" onchange="subirExcel(event)">
-          <div class="hint">Lee la hoja “Rpt. HojasRutas”, agrupa por patente y la publica. Podés subir <b>varios archivos</b> (ej. Rosen V y Rosen IV): se <b>suman</b>. Usá “Limpiar jornada” para empezar de cero.</div>
+          <div class="hint">Lee la hoja “Rpt. HojasRutas”, agrupa por patente y la publica. Puedes subir <b>varios archivos</b> (ej. Rosen V y Rosen IV): se <b>suman</b>. Usa “Limpiar jornada” para empezar de cero.</div>
         </div>
         <div class="card">
           <label>2 · Estado de las rutas <button class="btn bg" style="float:right;padding:5px 10px;font-size:12px" onclick="cargarEstado()">↻ Actualizar</button></label>
           <div id="lote-filtro-wrap" style="display:none;margin:0 0 10px">
             <select id="lote-filtro" onchange="renderEstado()" style="width:100%"></select>
           </div>
-          <div id="estado"><div class="empty">Subí la planificación o tocá “Actualizar”.</div></div>
+          <div id="estado"><div class="empty">Sube la planificación o toca “Actualizar”.</div></div>
           <div class="actions">
             <button class="btn b2" onclick="descargar()">⬇ Descargar secuencia<span id="dl-lote-lbl"></span></button>
             <button class="btn bg" onclick="limpiarJornada()">🗑 <span id="limpiar-lbl">Limpiar jornada (nuevo día)</span></button>
@@ -136,7 +136,7 @@
           <label>Operación y semana</label>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
             <select id="malla-op" onchange="loadMalla()" style="flex:1;min-width:150px">
-              <option value="">— elegí operación —</option>
+              <option value="">— elige operación —</option>
               <option value="rosen-vina">Rosen Viña</option>
               <option value="canon-vina">Canon Viña</option>
               <option value="canon-rm">Canon RM</option>
@@ -177,7 +177,7 @@
   <div id="panel-cho" class="hidden">
     <div class="card">
       <label>Elegí tu ruta / patente <button class="btn bg" style="float:right;padding:5px 10px;font-size:12px" onclick="cargarChoferes()">↻</button></label>
-      <select id="chofer-sel" onchange="abrirRuta()"><option value="">— elegí tu patente —</option></select>
+      <select id="chofer-sel" onchange="abrirRuta()"><option value="">— elige tu patente —</option></select>
     </div>
     <div class="card" id="ruta-card" style="display:none">
       <div id="rutalbl" style="font-weight:800;color:#002E5D;font-size:15px;margin-bottom:4px"></div>
@@ -301,7 +301,7 @@ async function cargarEstado(){
 function renderEstado(){
   const box=$('estado');
   const rows=_estadoRows||[];
-  if(!rows.length){box.innerHTML='<div class="empty">Aún no hay rutas publicadas. Subí la planificación.</div>';$('dl-lote-lbl').textContent='';return;}
+  if(!rows.length){box.innerHTML='<div class="empty">Aún no hay rutas publicadas. Sube la planificación.</div>';$('dl-lote-lbl').textContent='';return;}
   const f=($('lote-filtro')&&$('lote-filtro').value)||'';
   $('dl-lote-lbl').textContent=f?' ('+f+')':'';
   if($('limpiar-lbl'))$('limpiar-lbl').textContent=f?('Eliminar lote: '+f):'Limpiar jornada (nuevo día)';
@@ -330,9 +330,9 @@ async function limpiarJornada(){
     if($('lote-filtro'))$('lote-filtro').value='';
     toast('Lote eliminado: '+f); cargarEstado(); return;
   }
-  if(!confirm('¿Limpiar TODA la jornada? Se borran TODAS las rutas y secuencias (todos los lotes). Usalo al empezar el día. Si querés borrar solo un archivo, filtralo arriba primero.'))return;
+  if(!confirm('¿Limpiar TODA la jornada? Se borran TODAS las rutas y secuencias (todos los lotes). Úsalo al empezar el día. Si quieres borrar solo un archivo, fíltralo arriba primero.'))return;
   await sbDelete('jornada=eq.'+JORNADA);
-  toast('Jornada limpiada — subí la planificación del día'); cargarEstado();
+  toast('Jornada limpiada — sube la planificación del día'); cargarEstado();
 }
 
 // ---------- SUPERVISOR: descargar (solo Patente, Orden, Secuencia) ----------
@@ -375,7 +375,7 @@ async function cargarChoferes(){
   const rows=await sbGet(`jornada=eq.${JORNADA}&select=chofer&chofer=neq.__PLANILLA__`);
   const sel=$('chofer-sel');
   if(!rows||!rows.length){sel.innerHTML='<option value="">— no hay rutas publicadas —</option>';return;}
-  sel.innerHTML='<option value="">— elegí tu patente —</option>'+rows.sort((a,b)=>a.chofer.localeCompare(b.chofer)).map(r=>`<option value="${r.chofer.replace(/"/g,'')}">${r.chofer}</option>`).join('');
+  sel.innerHTML='<option value="">— elige tu patente —</option>'+rows.sort((a,b)=>a.chofer.localeCompare(b.chofer)).map(r=>`<option value="${r.chofer.replace(/"/g,'')}">${r.chofer}</option>`).join('');
 }
 async function abrirRuta(){
   const ch=$('chofer-sel').value;if(!ch){$('ruta-card').style.display='none';return;}
@@ -394,9 +394,9 @@ async function abrirRuta(){
 }
 function render(){
   const ul=$('list');
-  $('lockwrap').innerHTML=curCerrada?'<div class="lockbanner">🔒 Ruta cerrada. Avisá al supervisor si necesitás reabrirla.</div>':'';
+  $('lockwrap').innerHTML=curCerrada?'<div class="lockbanner">🔒 Ruta cerrada. Avisa al supervisor si necesitas reabrirla.</div>':'';
   $('cho-actions').style.display=curCerrada?'none':'flex';
-  $('count').textContent=items.length+' paradas'+(curCerrada?'':' — arrastrá o usá ▲▼ para ordenar');
+  $('count').textContent=items.length+' paradas'+(curCerrada?'':' — arrastra o usa ▲▼ para ordenar');
   if(!items.length){ul.innerHTML='<div class="empty">Sin paradas.</div>';return;}
   ul.innerHTML='';
   items.forEach((it,i)=>{
@@ -473,7 +473,7 @@ const MESC=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','d
 const ZONAS={'rosen-vina':[['VN','Viña del Mar'],['QV','Quilpué/V.Alemana'],['VL','Valparaíso'],['CR','Concón/Reñaca'],['LO','Limache/Olmué'],['IN','Interior'],['CNR','Costa N. lejana'],['CNU','Costa N. cercano'],['STS','Serv. técnico'],['ES','Especial'],['N/D','No disp.'],['N/C','No citado']]};
 ZONAS['canon-vina']=ZONAS['rosen-vina'];
 ZONAS['canon-rm']=[['CEN','Centro'],['OTE','Oriente'],['SOR','Suroriente'],['SUR','Sur'],['NTE','Norte'],['NP','Norponiente'],['PON','Poniente'],['RUR','Rural'],['FR','Rural Frecuencia'],['STS','Serv. técnico'],['ES','Especial'],['N/D','No disp.'],['N/C','No citado']];
-ZONAS['rosen-serena']=[['US','Urbano Serena'],['UC','Urbano Coquimbo'],['VS','Valle Serena'],['OV','Ovalle'],['INC','Interior/Valle'],['AN','Andacollo'],['CC','Costa Coquimbo'],['STS','Serv. técnico'],['ES','Especial'],['N/D','No disp.'],['N/C','No citado']];
+ZONAS['rosen-serena']=[['US','Urbano Serena'],['UC','Urbano Coquimbo'],['VS','Valle Serena'],['OV','Ovalle'],['INC','Interior/Valle'],['AN','Andacollo'],['CC','Costa Coquimbo'],['TDA','Tienda Serena'],['ES','Especial'],['N/D','No disp.'],['N/C','No citado']];
 ZONAS['canon-serena']=ZONAS['rosen-serena'];
 const ZCOLOR={VN:'#2F5277',QV:'#3E6B96',VL:'#5B6B7A',CR:'#4E8C8C',LO:'#6E8F5E',IN:'#D9B65C',CNR:'#B5705C',CNU:'#E0A36B',ES:'#8A7898','N/D':'#E3E1D9','N/C':'#F0EEE7',CEN:'#2F5277',OTE:'#5B6B7A',SOR:'#E0A36B',SUR:'#B5705C',NTE:'#4E8C8C',NP:'#3E6B96',PON:'#D9B65C',RUR:'#6E8F5E',FR:'#7E6A8A',US:'#2F5277',UC:'#4E8C8C',VS:'#6E8F5E',OV:'#3E6B96',INC:'#D9B65C',AN:'#8A7898',CC:'#B5705C',STS:'#9B5B6B',TDA:'#6E5B8A'};
 function zfg(z){return (z==='N/D'||z==='N/C')?'#8A8780':'#fff';}
@@ -485,6 +485,8 @@ function keyComuna(raw){return normC(raw).replace(/[.\-_/]/g,' ').replace(/\s+/g
 const COMUNA_IDX={};
 for(const k in COMUNA2ZONA){const z=COMUNA2ZONA[k];const ck=keyComuna(k);[ck,ck.replace(/^(LA|EL|LOS|LAS) /,''),ck.replace(/ /g,'')].forEach(v=>{if(v&&!COMUNA_IDX[v])COMUNA_IDX[v]=z;});}
 function matchZona(raw){const c=keyComuna(raw);if(!c)return null;const cand=[c,c.replace(/^(LA|EL|LOS|LAS) /,''),c.replace(/ /g,'')];for(const k of cand){if(COMUNA_IDX[k])return COMUNA_IDX[k];}return null;}
+// Tienda de La Serena: una dirección puntual que viene tipificada como tienda. La detectamos por su dirección (Ruta 5 Norte / Regimiento Arica).
+function esTiendaSerena(dir){const t=keyComuna(dir);return t.includes('REGTO ARIC')||t.includes('REGIMIENTO ARIC')||(t.includes('RUTA 5 NORTE')&&t.includes('ARIC'));}
 function brandOf(op){return (op||'').indexOf('canon')===0?'canon':'rosen';}
 function opNombre(op){return {'rosen-vina':'Rosen Viña','canon-vina':'Canon Viña','canon-rm':'Canon RM','rosen-serena':'Rosen Serena','canon-serena':'Canon Serena'}[op]||op;}
 // Comunas por zona (para la nomenclatura/leyenda #8)
@@ -562,7 +564,7 @@ async function saveMalla(notify){
   return ok;
 }
 function subirPreplany(e){
-  if(!MALLA.op){toast('Primero elegí una operación',1);e.target.value='';return;}
+  if(!MALLA.op){toast('Primero elige una operación',1);e.target.value='';return;}
   const f=e.target.files[0];if(!f)return;const rd=new FileReader();
   rd.onload=async ev=>{
     try{
@@ -587,18 +589,23 @@ function subirPreplany(e){
         if(region==='vina')nv++;else if(region==='serena')ns++;else if(region==='rm')nr++;
         const stsTxt=[iTipo,iDesc,iSrv,iCentro].filter(x=>x>=0).map(x=>normC(r[x])).join(' ');
         const isSTS=/\bSTS\b|\bSSTT\b|SERVICIO TECNIC|SERV TECNIC/.test(stsTxt);
+        const dirTxt=iDir>=0?String(r[iDir]||''):'';
+        const isTienda=esTiendaSerena(dirTxt)||esTiendaSerena(dirTxt+' '+comuna);   // tienda de La Serena por dirección
         const o=iO>=0?String(r[iO]).trim():String(Math.random());
         const oU=o.toUpperCase();const retiro=oU.startsWith('006')||/_REC$/.test(oU);   // retiro/reciclaje → m³ 0
         const cantL=parseFloat(String(iCant>=0?r[iCant]:'1').replace(',','.'))||1;
         const volBase=parseFloat(String(iVol>=0?r[iVol]:'0').replace(',','.'))||0;
         const sofa=(iDesc>=0&&normC(r[iDesc]).includes('SOFA'))?cantL:0;                // sofá: +1 m³ por unidad
         const v=retiro?0:(volBase+sofa)/cantL;                                          // dividido por cantidad = m³ real
-        parsed.push({comuna,zbase,region,isSTS,v,o});
+        parsed.push({comuna,zbase,region,isSTS,isTienda,v,o});
       });
       const majority=(nr>=nv&&nr>=ns&&nr>0)?'rm':(ns>nv?'serena':'vina');
       parsed.forEach(p=>{
         const R=p.region||majority;const B=reg[R];B.ord.add(p.o);
-        let z=p.isSTS?'STS':p.zbase;
+        // Tienda Serena (solo en Serena) tiene prioridad; STS se separa solo fuera de Serena (en Viña es importante, en Serena va al despacho normal).
+        let z = (R==='serena'&&p.isTienda) ? 'TDA'
+              : (p.isSTS&&R!=='serena') ? 'STS'
+              : p.zbase;
         if(z){
           B.vol[z]=(B.vol[z]||0)+p.v;const gk=R+'|'+z+'|'+p.o;if(!seen[gk]){seen[gk]=1;B.volg[z]=(B.volg[z]||0)+1;}
           if(z!=='STS'&&p.comuna){const cc=keyComuna(p.comuna);B.comdet[z]=B.comdet[z]||{};B.comdet[z][cc]=B.comdet[z][cc]||{vol:0,g:0};B.comdet[z][cc].vol+=p.v;const ck=R+'|'+z+'|'+cc+'|'+p.o;if(!seenC[ck]){seenC[ck]=1;B.comdet[z][cc].g++;}}
@@ -664,7 +671,7 @@ function renderGrid(){
   const pn=patentesDeNodo(op);
   const manual=(MALLA.patManual||[]).filter(p=>!pn.planta.some(x=>x.pat===p)&&!pn.backup.some(x=>x.pat===p)).map(p=>({pat:p,tipo:'',uso:'manual'}));
   const ds=weekDates(MALLA.week);
-  if(!pn.planta.length&&!pn.backup.length&&!manual.length){$('malla-grid').innerHTML='<div class="empty">Sin patentes. Subí el Maestro (⚙) o agregá con “+ patente”.</div>'+addBtn();return;}
+  if(!pn.planta.length&&!pn.backup.length&&!manual.length){$('malla-grid').innerHTML='<div class="empty">Sin patentes. Sube el Maestro (⚙) o agrega con “+ patente”.</div>'+addBtn();return;}
   let head='<tr><th class="pat">Patente</th>';
   DIAS.forEach(([k,lbl],i)=>{const lk=MALLA.lock[k];const dn=ds?(' '+ds[i].getUTCDate()):'';head+=`<th>${lbl}${dn}<br><button class="lockbtn${lk?' on':''}" onclick="toggleLock('${k}')">${lk?'🔒':'🔓'}</button></th>`;});
   head+='<th>Días</th><th></th></tr>';
@@ -697,9 +704,15 @@ function addBtn(){return '<div style="margin-top:8px"><button class="btn bg" sty
 function setCell(p,k,v){
   if(!MALLA.asign[p])MALLA.asign[p]={};
   const prev=MALLA.asign[p][k]||'';
-  if(prev&&prev!==v){if(!MALLA.orig[p])MALLA.orig[p]={};if(!MALLA.orig[p][k])MALLA.orig[p][k]=prev;} // #4 guarda el original al modificar
+  if(esAdmin()){
+    // El ADMIN modifica sobre lo que dejó el supervisor → recién acá se registra el "orig" y se ve la diferencia.
+    if(prev&&prev!==v){if(!MALLA.orig[p])MALLA.orig[p]={};if(!MALLA.orig[p][k])MALLA.orig[p][k]=prev;}
+    if(MALLA.orig[p]&&MALLA.orig[p][k]===v){delete MALLA.orig[p][k];} // si vuelve al valor del supervisor, limpia el diff
+  }else{
+    // El SUPERVISOR arma la malla: su valor es la base, sin dejar registro de cambio.
+    if(MALLA.orig[p])delete MALLA.orig[p][k];
+  }
   MALLA.asign[p][k]=v;
-  if(MALLA.orig[p]&&MALLA.orig[p][k]===v){delete MALLA.orig[p][k];} // si vuelve al original, limpia el diff
   renderGrid();saveMalla();
 }
 function toggleLock(k){MALLA.lock[k]=!MALLA.lock[k];renderGrid();saveMalla();}
