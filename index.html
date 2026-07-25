@@ -261,7 +261,7 @@ function subirExcel(e){
       const iC=find('nombre contacto','cliente','contacto');
       const iD=find('direccion','dirección'), iCom=find('comuna');
       const iLat=find('latitud','lat'), iLng=find('longitud','lng','lon');
-      const iCentro=find('centro'),iHora=find('hora'),iHR=find('hr'),iCond=find('chofer','conductor'); // #16 · extras para formato Ruta
+      const iCentro=find('centro'),iHora=find('hora','ventana','horario','franja','tramo','ventana horaria'),iHR=find('hr'),iCond=find('chofer','conductor'); // #16 · extras para formato Ruta
       if(iO<0){toast('No encontré la columna de N° de guía/orden',1);return;}
       const filas=d.slice(1).filter(r=>String(r[iO]||'').trim());
       const byCh={},seen={};
@@ -347,18 +347,27 @@ async function limpiarJornada(){
 
 // ---------- SUPERVISOR: descargar (#16/#18/#21 · Ruta + Planificación tal cual + Bajadas puro) ----------
 function fstamp(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+// normaliza el N° de orden para cruzar aunque difiera el sufijo (_306) o separadores
+function normOrd(o){return String(o||'').toUpperCase().replace(/_\d+$/,'').replace(/[^A-Z0-9]/g,'');}
+// fecha del DÍA de la malla (para nombrar las descargas con esa fecha, no la de hoy)
+function mallaDayStamp(){if(MALLA.op&&MALLA.week){const mch=/d(\d{4}-\d{2}-\d{2})/.exec(dayDateKey(pickOcupDia()));if(mch)return mch[1];}return fstamp();}
 // #18 · lee el DETALLE crudo de la pre-planilla del día (para cruce y descargas). Devuelve {head,rows,índices} o null.
 async function readPreplani(){
-  const rows=await sbGet(`jornada=eq.${encodeURIComponent('preplani:'+JORNADA)}&chofer=eq.__DET__&select=data`);
-  if(!rows||!rows.length||!rows[0].data||!rows[0].data.head)return null;
-  const head=rows[0].data.head,rws=rows[0].data.rows||[];
-  const hl=head.map(x=>String(x).trim().toLowerCase());
-  const col=(...n)=>{for(const x of n){const i=hl.findIndex(h=>h===x||h.includes(x));if(i>=0)return i;}return -1;};
-  const iPatH=hl.findIndex(h=>h==='columna3');
-  return {head,rows:rws,iO:col('nro.f12','numero guia','guia','orden'),iPat:(iPatH>=0?iPatH:head.length-1),
-    iCom:col('comuna'),iVol:col('volumen','volúmen'),iCol2:col('columna2'),iDir:col('direccion','dirección'),
-    iCentro:col('centro'),iHR:hl.findIndex(h=>h==='hr'),iHora:col('hora'),iCli:col('cliente','contacto'),
-    iCant:col('cantidad ruta','cantidad'),iDescMat:col('descripcion mat','descripción mat','material'),iDesc:col('descripción','descripcion')};
+  // #req2 · baja con la fecha del DÍA que está en la MALLA (no la de hoy); fallback a hoy
+  const keys=[];if(MALLA.op&&MALLA.week)keys.push('preplani:'+dayDateKey(pickOcupDia()));keys.push('preplani:'+JORNADA);
+  for(const key of [...new Set(keys)]){
+    const rows=await sbGet(`jornada=eq.${encodeURIComponent(key)}&chofer=eq.__DET__&select=data`);
+    if(!rows||!rows.length||!rows[0].data||!rows[0].data.head)continue;
+    const head=rows[0].data.head,rws=rows[0].data.rows||[];
+    const hl=head.map(x=>String(x).trim().toLowerCase());
+    const col=(...n)=>{for(const x of n){const i=hl.findIndex(h=>h===x||h.includes(x));if(i>=0)return i;}return -1;};
+    const iPatH=hl.findIndex(h=>h==='columna3');
+    return {head,rows:rws,iO:col('nro.f12','numero guia','guia','orden'),iPat:(iPatH>=0?iPatH:head.length-1),
+      iCom:col('comuna'),iVol:col('volumen','volúmen'),iCol2:col('columna2'),iDir:col('direccion','dirección'),
+      iCentro:col('centro'),iHR:hl.findIndex(h=>h==='hr'),iHora:col('hora'),iCli:col('cliente','contacto'),
+      iCant:col('cantidad ruta','cantidad'),iDescMat:col('descripcion mat','descripción mat','material'),iDesc:col('descripción','descripcion')};
+  }
+  return null;
 }
 // #Planif · volumen ajustado según la fórmula de Malla (retiro 006/_REC→0, sofá +1 m³ por unidad, sin dividir)
 function adjVolRow(pp,r){
@@ -368,25 +377,57 @@ function adjVolRow(pp,r){
   const dm=[pp.iDescMat,pp.iDesc].filter(x=>x>=0).map(x=>normC(r[x])).join(' ');const sofa=dm.includes('SOFA')?cant:0;
   return retiro?0:(volBase+sofa);
 }
-// Rpt. HojasRutas con columnas A–Q + R(Volumen ajustado) + S(Patente)
-function rptSheetAoa(pp,rows){
+// Rpt. HojasRutas con columnas A–Q + R(Volumen ajustado) + S(Patente). patOf(r) define la patente (por defecto Columna3 del archivo).
+function rptSheetAoa(pp,rows,patOf){
   const n=17;const head=pp.head.slice(0,n).concat(['Volumen (ajustado)','Patente']);
-  const aoa=[head];rows.forEach(r=>aoa.push(r.slice(0,n).concat([+adjVolRow(pp,r).toFixed(3),String(r[pp.iPat]||'').trim()])));
+  const aoa=[head];rows.forEach(r=>aoa.push(r.slice(0,n).concat([+adjVolRow(pp,r).toFixed(3), patOf?patOf(r):String(r[pp.iPat]||'').trim()])));
   return aoa;
+}
+// #malla · zona→patente(s) del día desde la malla (para poner la patente asignada en las descargas)
+function zonaPatMap(asign,dayK){
+  const m={};Object.keys(asign||{}).forEach(pat=>{const c=cellArr((asign[pat]||{})[dayK]);[c[0],c[1]].forEach((z,slot)=>{if(!z)return;m[z]=m[z]||{prim:[],sec:[]};(slot===0?m[z].prim:m[z].sec).push(pat);});});return m;
+}
+function patDeZona(m,z){if(!z||!m[z])return '';return (m[z].prim[0]||m[z].sec[0]||'');}   // patente principal de la zona (si no, la secundaria)
+// asignación + día de la malla Rosen Viña para el día en curso (usa la que está en memoria si está cargada, si no la trae de la nube)
+async function mallaAsignDia(){
+  if(MALLA.op==='rosen-vina'&&Object.keys(MALLA.asign||{}).length)return {asign:MALLA.asign,dayK:pickOcupDia()};
+  const wk=MALLA.week||isoWeekKey(new Date());
+  const rr=await sbGet(`jornada=eq.${encodeURIComponent('malla:rosen-vina:'+wk)}&chofer=eq.__MALLA__&select=data`);
+  const asign=(rr&&rr.length&&rr[0].data&&rr[0].data.asign)||{};
+  const ds=weekDates(wk);let dayK='L';
+  if(ds){const t=new Date();const ymd=x=>x.getUTCFullYear()+'-'+x.getUTCMonth()+'-'+x.getUTCDate();const ti=ds.findIndex(x=>ymd(x)===ymd(new Date(Date.UTC(t.getFullYear(),t.getMonth(),t.getDate()))));if(ti>=0)dayK=DIAS[ti][0];}
+  return {asign,dayK};
 }
 // Mapa orden → datos ricos (centro/comuna/hr/…) desde la pre-planilla, para completar el formato Ruta (#18).
 function crossFromPreplani(pp){const m={};if(!pp)return m;pp.rows.forEach(r=>{const o=String(r[pp.iO]||'').trim();if(!o||m[o])return;m[o]={centro:pp.iCentro>=0?String(r[pp.iCentro]||'').trim():'',com:pp.iCom>=0?String(r[pp.iCom]||'').trim():'',hr:pp.iHR>=0?String(r[pp.iHR]||'').trim():'',hora:pp.iHora>=0?String(r[pp.iHora]||'').trim():'',cli:pp.iCli>=0?String(r[pp.iCli]||'').trim():'',dir:pp.iDir>=0?String(r[pp.iDir]||'').trim():''};});return m;}
+// #18 robusto · cruza contra TODA la pre-plani guardada en la base (una sola consulta, sin depender de adivinar el día/semana).
+async function crossAllDays(){
+  const recs=await sbGet(`chofer=eq.__DET__&jornada=like.preplani:*&select=data`);
+  const m={};const def={centro:'',hr:''};
+  (recs||[]).forEach(rec=>{
+    const data=rec.data;if(!data||!data.head)return;
+    const head=data.head,rws=data.rows||[];const hl=head.map(x=>String(x).trim().toLowerCase());
+    const col=(...n)=>{for(const x of n){const i=hl.findIndex(h=>h===x||h.includes(x));if(i>=0)return i;}return -1;};
+    const iO=col('nro.f12','numero guia','guia','orden'),iCom=col('comuna'),iDir=col('direccion','dirección'),iCentro=col('centro'),iHR=hl.findIndex(h=>h==='hr'),iHora=col('hora'),iCli=col('cliente','contacto');
+    rws.forEach(r=>{const o=String(r[iO]||'').trim();if(!o)return;
+      const centro=iCentro>=0?String(r[iCentro]||'').trim():'',hr=iHR>=0?String(r[iHR]||'').trim():'';
+      if(centro&&!def.centro)def.centro=centro;if(hr&&!def.hr)def.hr=hr;
+      if(m[o])return;const recd={centro,com:iCom>=0?String(r[iCom]||'').trim():'',hr,hora:iHora>=0?String(r[iHora]||'').trim():'',cli:iCli>=0?String(r[iCli]||'').trim():'',dir:iDir>=0?String(r[iDir]||'').trim():''};m[o]=recd;const no=normOrd(o);if(no&&!m[no])m[no]=recd;});   // también por N° normalizado
+  });
+  return {m,def};
+}
 // Hoja tipo RUTA (formato chofer) para una patente, completando datos con el cruce de la pre-planilla.
 function hojaRuta(r,cross){
-  cross=cross||{};
+  const map=(cross&&cross.m)||{},def=(cross&&cross.def)||{};
   const paradas=(r.data&&r.data.paradas)||[];
   const seq=(r.data&&r.data.seq)||paradas.map(p=>p.orden);
   if(!seq.length)return null;
   const byOrd={};paradas.forEach(p=>byOrd[p.orden]=p);
   const aoa=[['Centro','Nro.F12','Cliente','Dirección','Comuna','Hora','HR','Patente','Secuencia']];
   let cond='';
-  seq.forEach((orden,i)=>{const p=byOrd[orden]||{},x=cross[String(orden).trim()]||{};if(p.cond&&!cond)cond=p.cond;
-    aoa.push([p.centro||x.centro||'',orden,p.cliente||x.cli||'',p.dir||p.direccion||x.dir||'',p.comuna||x.com||'',p.hora||x.hora||'',p.hr||x.hr||'',r.chofer,i+1]);});
+  seq.forEach((orden,i)=>{const p=byOrd[orden]||{},x=map[String(orden).trim()]||map[normOrd(orden)]||{};if(p.cond&&!cond)cond=p.cond;
+    const dj=p.direccion||x.dir||'';let com=p.comuna||x.com||'';if(!com&&dj.indexOf(',')>=0)com=dj.split(',').pop().trim();   // respaldo: comuna desde la dirección
+    aoa.push([p.centro||x.centro||def.centro||'',orden,p.cliente||x.cli||'',p.dir||dj,com,p.hora||x.hora||'',p.hr||x.hr||def.hr||'',r.chofer,i+1]);});
   aoa.push([]);aoa.push(['','CONDUCTOR',cond||'']);aoa.push(['','PATENTE',r.chofer]);
   aoa.push(['','AYUDANTE','']);aoa.push(['','FONO','']);
   const name=(r.chofer||'ruta').replace(/[^0-9A-Za-z]/g,'').slice(0,31)||'RUTA';
@@ -400,7 +441,7 @@ async function dlRutaFmt(){
   const f=($('lote-filtro')&&$('lote-filtro').value)||'';
   const sel=f?all.filter(r=>loteDe(r)===f):all;
   if(!sel.length){toast('No hay patentes en ese lote',1);return;}
-  const cross=crossFromPreplani(await readPreplani());
+  const cross=await crossAllDays();
   const wb=XLSX.utils.book_new();let n=0;const used={};
   sel.sort((a,b)=>a.chofer.localeCompare(b.chofer)).forEach(r=>{
     const h=hojaRuta(r,cross);if(!h)return;let nm=h.name;while(used[nm])nm=(nm.slice(0,28)+(++used[h.name]||''));used[nm]=1;
@@ -408,24 +449,24 @@ async function dlRutaFmt(){
   });
   if(!n){toast('Aún no hay secuencias cargadas por los choferes',1);return;}
   const tag=f?'_'+f.replace(/[^0-9A-Za-z]+/g,'-').replace(/^-|-$/g,''):'';
-  XLSX.writeFile(wb,'Ruta_Rosen'+tag+'_'+fstamp()+'.xlsx');
+  XLSX.writeFile(wb,'Ruta_Rosen'+tag+'_'+mallaDayStamp()+'.xlsx');
   toast('Ruta descargada ('+n+' patentes)'+(Object.keys(cross).length?'':' · sin pre-plani para cruzar'));
 }
 // Descargar el formato RUTA de UNA patente (botón ⬇ del estado).
 async function descargarRuta(ch){
   const rr=await sbGet(`jornada=eq.${JORNADA}&chofer=eq.${encodeURIComponent(ch)}&select=chofer,data`);
   if(!rr||!rr.length){toast('No encontré la ruta',1);return;}
-  const cross=crossFromPreplani(await readPreplani());
+  const cross=await crossAllDays();
   const h=hojaRuta(rr[0],cross);if(!h){toast('Esa patente aún no tiene secuencia',1);return;}
   const ws=XLSX.utils.aoa_to_sheet(h.aoa);ws['!cols']=RUTACOLS;
   const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,h.name);
-  XLSX.writeFile(wb,'Ruta_'+ch.replace(/[^0-9A-Za-z]/g,'')+'_'+fstamp()+'.xlsx');
+  XLSX.writeFile(wb,'Ruta_'+ch.replace(/[^0-9A-Za-z]/g,'')+'_'+mallaDayStamp()+'.xlsx');
   toast('Descargada ruta de '+ch);
 }
 // #21 · Hoja1 dinámica por patente (Columna3): recuento distinto Nro.F12/Dirección + Σ Volumen/Columna2 + Total general.
-function pivotHoja1(rows,iO,iPat,iVol,iCol2,iDir){
+function pivotHoja1(rows,iO,iPat,iVol,iCol2,iDir,patOf){
   const piv={},order=[];
-  rows.forEach(r=>{const pat=String(r[iPat]||'').trim();if(!pat)return;
+  rows.forEach(r=>{const pat=patOf?patOf(r):String(r[iPat]||'').trim();if(!pat)return;
     if(!piv[pat]){piv[pat]={ord:new Set(),dir:new Set(),vol:0,col2:0};order.push(pat);}
     const b=piv[pat];b.ord.add(String(r[iO]||'').trim());b.dir.add(iDir>=0?String(r[iDir]||'').trim():'');
     b.vol+=parseFloat(String(iVol>=0?r[iVol]:0).replace(',','.'))||0;b.col2+=parseFloat(String(iCol2>=0?r[iCol2]:0).replace(',','.'))||0;});
@@ -439,10 +480,13 @@ function pivotHoja1(rows,iO,iPat,iVol,iCol2,iDir){
 async function dlPlanFmt(){
   const pp=await readPreplani();
   if(!pp){toast('No hay pre-planilla del día. Subíla en la pestaña Malla (⬆ Pre-planilla).',1);return;}
+  const {asign,dayK}=await mallaAsignDia();const zmap=zonaPatMap(asign,dayK);
+  const patOf=r=>patDeZona(zmap,matchZona(pp.iCom>=0?r[pp.iCom]:'')||'');   // patente = la de la malla según la zona de la comuna
+  const nZ=Object.keys(zmap).length;
   const wb=XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rptSheetAoa(pp,pp.rows)),'Rpt. HojasRutas');
-  XLSX.writeFile(wb,'Planificacion_Rosen_'+fstamp()+'.xlsx');
-  toast('Planificación descargada');
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rptSheetAoa(pp,pp.rows,patOf)),'Rpt. HojasRutas');
+  XLSX.writeFile(wb,'Planificacion_Rosen_'+mallaDayStamp()+'.xlsx');
+  toast(nZ?('Planificación descargada (patente de la malla)'):'Planificación descargada · OJO: malla vacía, sin patentes',nZ?0:1);
 }
 // #21 · Descarga BAJADAS archivo PURO (órdenes de la pre-plani que ningún chofer secuenció).
 async function dlBajadas(){
@@ -452,10 +496,12 @@ async function dlBajadas(){
   const seqSet={};(all||[]).forEach(r=>{const seq=(r.data&&r.data.seq)||[];seq.forEach(o=>seqSet[String(o).trim()]=1);});
   const bajRows=pp.rows.filter(r=>{const o=String(r[pp.iO]||'').trim();return o&&!seqSet[o];});
   if(!bajRows.length){toast('Sin bajadas: todas las órdenes fueron secuenciadas ✓');return;}
+  const {asign,dayK}=await mallaAsignDia();const zmap=zonaPatMap(asign,dayK);
+  const patOf=r=>patDeZona(zmap,matchZona(pp.iCom>=0?r[pp.iCom]:'')||'');
   const wb=XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(pivotHoja1(bajRows,pp.iO,pp.iPat,pp.iVol,pp.iCol2,pp.iDir)),'Hoja1');
-  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rptSheetAoa(pp,bajRows)),'Rpt. HojasRutas');
-  XLSX.writeFile(wb,'Bajadas_Rosen_'+fstamp()+'.xlsx');
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(pivotHoja1(bajRows,pp.iO,pp.iPat,pp.iVol,pp.iCol2,pp.iDir,patOf)),'Hoja1');
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rptSheetAoa(pp,bajRows,patOf)),'Rpt. HojasRutas');
+  XLSX.writeFile(wb,'Bajadas_Rosen_'+mallaDayStamp()+'.xlsx');
   toast('Bajadas descargadas · '+bajRows.length+' líneas');
 }
 
@@ -697,7 +743,7 @@ function renderWeekLbl(){const ds=weekDates(MALLA.week);if(!ds){$('malla-weeklbl
 // ---- Estado + persistencia (por operación + semana) ----
 // vol/volg/comdet/sinzona/fcarga/totOrd = VISTA del día seleccionado (derivada de *Dia). La pre-plani se ancla POR DÍA (#req2).
 let MALLA={op:'',week:'',asign:{},orig:{},lock:{},vol:{},volg:{},comdet:{},sinzona:{},fcarga:'',patManual:[],totOrd:0,ocup:null,
-  volDia:{},volgDia:{},comdetDia:{},sinzDia:{},fcargaDia:{},totOrdDia:{},reprogDia:{},bandaDia:{},reprog:[],banda:{}};
+  volDia:{},volgDia:{},comdetDia:{},sinzDia:{},fcargaDia:{},totOrdDia:{},reprogDia:{},bandaDia:{},reprog:[],banda:{},extraDia:{}};
 // fecha (clave tipo JORNADA) del día k de la semana actual — para anclar/leer la pre-plani por día
 function dayDateKey(k){const ds=weekDates(MALLA.week);const i=DIAS.findIndex(d=>d[0]===k);if(!ds||i<0)return JORNADA;const x=ds[i];return 'd'+x.getUTCFullYear()+'-'+String(x.getUTCMonth()+1).padStart(2,'0')+'-'+String(x.getUTCDate()).padStart(2,'0');}
 // refresca la VISTA (MALLA.vol…) al día seleccionado
@@ -716,7 +762,7 @@ async function loadMalla(){
   const d=(rows&&rows.length&&rows[0].data)?rows[0].data:{};
   MALLA.asign=d.asign||{};MALLA.orig=d.orig||{};MALLA.lock=d.lock||{};MALLA.patManual=d.patManual||[];MALLA.ocup=d.ocup||null;
   MALLA.volDia=d.volDia||{};MALLA.volgDia=d.volgDia||{};MALLA.comdetDia=d.comdetDia||{};MALLA.sinzDia=d.sinzDia||{};MALLA.fcargaDia=d.fcargaDia||{};MALLA.totOrdDia=d.totOrdDia||{};
-  MALLA.reprogDia=d.reprogDia||{};MALLA.bandaDia=d.bandaDia||{};
+  MALLA.reprogDia=d.reprogDia||{};MALLA.bandaDia=d.bandaDia||{};MALLA.extraDia=d.extraDia||{};
   zonaExp=null;ocupDia='';
   // migración: registros viejos con vol plano (por semana) → lo pasamos al día por defecto
   if(!Object.keys(MALLA.volDia).length && d.vol && Object.keys(d.vol).length){const mk=pickOcupDia();MALLA.volDia[mk]=d.vol;MALLA.volgDia[mk]=d.volg||{};MALLA.comdetDia[mk]=d.comdet||{};MALLA.sinzDia[mk]=d.sinzona||{};MALLA.fcargaDia[mk]=d.fcarga||'';MALLA.totOrdDia[mk]=d.totOrd||0;}
@@ -732,7 +778,7 @@ async function saveMalla(notify){
   if(!MALLA.op)return false;
   const ocup=buildOcupSnap();MALLA.ocup=ocup;renderHist();
   const ok=await sbUpsert([{jornada:mallaKey(),chofer:'__MALLA__',data:{asign:MALLA.asign,orig:MALLA.orig,lock:MALLA.lock,patManual:MALLA.patManual,ocup,
-    volDia:MALLA.volDia,volgDia:MALLA.volgDia,comdetDia:MALLA.comdetDia,sinzDia:MALLA.sinzDia,fcargaDia:MALLA.fcargaDia,totOrdDia:MALLA.totOrdDia,reprogDia:MALLA.reprogDia,bandaDia:MALLA.bandaDia},cerrada:false}]);
+    volDia:MALLA.volDia,volgDia:MALLA.volgDia,comdetDia:MALLA.comdetDia,sinzDia:MALLA.sinzDia,fcargaDia:MALLA.fcargaDia,totOrdDia:MALLA.totOrdDia,reprogDia:MALLA.reprogDia,bandaDia:MALLA.bandaDia,extraDia:MALLA.extraDia},cerrada:false}]);
   if(ok&&notify)toast('Malla guardada ✓');
   return ok;
 }
@@ -934,6 +980,13 @@ function computeOcupDay(k){
   Object.keys(demand).forEach(z=>{remaining[z]-=repartir(remaining[z],trucks.filter(t=>!t.solo&&t.z1===z),'f1');});      // 2) 2-zonas · principal (remanente)
   Object.keys(demand).forEach(z=>{remaining[z]-=repartir(remaining[z],trucks.filter(t=>!t.solo&&t.z2===z),'f2');});      // 3) 2-zonas · secundaria (excedente)
   trucks.forEach(t=>t.idle=t.left);
+  // #27-extra · asignaciones ADICIONALES (3ª zona): usan la capacidad libre del camión (o su capacidad completa si no estaba asignado ese día) y rebajan el contenedor
+  const extras=(MALLA.extraDia&&MALLA.extraDia[k])||[];
+  const tByPat={};trucks.forEach(t=>tByPat[t.pat]=t);
+  extras.forEach(e=>{const z=e.zona;if(!(z in remaining))return;
+    let t=tByPat[e.pat];
+    if(!t){const cp=capDe(e.pat);t={pat:e.pat,cap:cp,z1:'',z2:'',f1:0,f2:0,fe:0,idle:cp,solo:false,extra:true};trucks.push(t);tByPat[e.pat]=t;if(cp)anyCap=true;else if(noMT.indexOf(e.pat)<0)noMT.push(e.pat);}
+    const fill=Math.max(0,Math.min(t.idle,remaining[z]));t.fe=(t.fe||0)+fill;t.idle-=fill;remaining[z]-=fill;t.extraZona=z;});
   const filled={};Object.keys(demand).forEach(z=>filled[z]=demand[z]-(remaining[z]||0));
   const totIdle=trucks.reduce((s,t)=>s+t.idle,0),totCap=trucks.reduce((s,t)=>s+t.cap,0);
   return {demand,filled,remaining,trucks,totIdle,totCap,veh:trucks.length,anyCap,noMT};
@@ -941,13 +994,14 @@ function computeOcupDay(k){
 function setOcupDia(k){ocupDia=k;applyDay();renderVol();renderCap();renderGrid();}
 // #27a · tolerancia de cobertura: una zona se da por cubierta si le falta menos que max(1% demanda, 0.3 m³)
 function covTol(dem){return Math.max(dem*0.01,0.3);}
-// #27c · asignar una patente a una zona con remanente (a su primera caja libre del día)
+// #27c · asignar una patente ADICIONAL (3ª zona, extra a las 2 de la celda): usa su capacidad libre y rebaja el contenedor
 function asignarRemanente(pat,zona){
-  if(!pat)return;const k=pickOcupDia();const cc=cellArr((MALLA.asign[pat]||{})[k]);
-  const slot=cc[0]?(cc[1]?-1:1):0;
-  if(slot<0){toast(pat+' ya tiene 2 zonas ese día',1);return;}
-  setCell(pat,k,slot,zona);toast(pat+' → '+zona+(slot?' (secundaria)':' (principal)'));
+  if(!pat)return;const k=pickOcupDia();
+  MALLA.extraDia=MALLA.extraDia||{};MALLA.extraDia[k]=MALLA.extraDia[k]||[];
+  MALLA.extraDia[k].push({pat,zona});
+  saveMalla();renderCap();renderGrid();toast(pat+' → '+zona+' (adicional)');
 }
+function quitarExtra(idx){const k=pickOcupDia();if(MALLA.extraDia&&MALLA.extraDia[k]){MALLA.extraDia[k].splice(idx,1);if(!MALLA.extraDia[k].length)delete MALLA.extraDia[k];saveMalla();renderCap();renderGrid();}}
 function renderCap(){
   const box=$('malla-cap');if(!box)return;
   if(!MALLA.op||!isRosenOp()){box.innerHTML='';return;}   // #26 · contenedores solo Rosen
@@ -967,19 +1021,20 @@ function renderCap(){
   }).join('');
   // #27b/#27c · Remanentes (falta por asignar) + selector de patente con caja libre
   const pn=patentesDeNodo(MALLA.op);const allP=[...new Set(pn.planta.concat(pn.backup).map(p=>p.pat).concat(MALLA.patManual||[]))];
-  const freeSlotOf=p=>{const cc=cellArr((MALLA.asign[p]||{})[k]);return cc[0]?(cc[1]?-1:1):0;};
-  const libreOf=p=>{const a=oc.trucks.find(t=>t.pat===p);return a?a.idle:capDe(p);};
-  const avail=allP.filter(p=>freeSlotOf(p)>=0).sort((a,b)=>libreOf(b)-libreOf(a));
+  const libreOf=p=>{const a=oc.trucks.find(t=>t.pat===p);return a?a.idle:capDe(p);};   // capacidad LIBRE (ociosa si ya está asignado; completa si no)
+  const avail=allP.filter(p=>libreOf(p)>0.05).sort((a,b)=>libreOf(b)-libreOf(a));
   const rem=zk.filter(z=>(oc.demand[z]-oc.filled[z])>covTol(oc.demand[z]));
+  const extras=(MALLA.extraDia&&MALLA.extraDia[k])||[];
+  const extraHtml=extras.length?('<div style="margin-top:5px;font-size:10px;color:#8A8780">➕ Adicionales asignados:</div>'+extras.map((e,idx)=>`<div style="display:flex;justify-content:space-between;align-items:center;font-size:10px;border:1px solid #e6e4dd;border-radius:6px;padding:2px 6px;margin-top:2px"><span><span class="zleg" style="background:${ZCOLOR[e.zona]||'#888'};color:${zfg(e.zona)}">${e.zona}</span> ${e.pat} · ${libreOf(e.pat).toFixed(1)} libre</span><button class="lockbtn" onclick="quitarExtra(${idx})" title="Quitar">✕</button></div>`).join('')):'';
   let remHtml='';
   if(rem.length){
     const opts='<option value="">+ patente…</option>'+avail.map(p=>`<option value="${p}">${p} · ${libreOf(p).toFixed(1)} m³ libre</option>`).join('');
-    remHtml='<div style="margin-top:6px;border:1px solid #f1c9c4;background:#fdecea;border-radius:8px;padding:6px 7px"><div style="font-size:10.5px;font-weight:800;color:#c0392b;margin-bottom:4px">🔴 Falta por asignar</div>'
+    remHtml='<div style="margin-top:6px;border:1px solid #f1c9c4;background:#fdecea;border-radius:8px;padding:6px 7px"><div style="font-size:10.5px;font-weight:800;color:#c0392b;margin-bottom:4px">🔴 Falta por asignar (adicional a las 2 zonas)</div>'
       +rem.map(z=>{const short=oc.demand[z]-oc.filled[z];return `<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:4px"><span><span class="zleg" style="background:${ZCOLOR[z]||'#888'};color:${zfg(z)}">${z}</span> falta <b>${short.toFixed(1)}</b> m³</span><select style="font-size:10px;padding:2px;max-width:140px" onchange="asignarRemanente(this.value,'${z}')">${opts}</select></div>`;}).join('')
-      +(avail.length?'':'<div style="font-size:9px;color:#8A8780">No hay camiones con caja libre este día — agregá patente o liberá una.</div>')
-      +'</div>';
+      +(avail.length?'':'<div style="font-size:9px;color:#8A8780">No hay camiones con capacidad libre este día.</div>')
+      +extraHtml+'</div>';
   } else if(zk.length){
-    remHtml='<div style="margin-top:6px;font-size:10.5px;color:#1a7a3c;font-weight:700;text-align:center">✓ Todo cubierto</div>';
+    remHtml='<div style="margin-top:6px;border:1px solid #b7dcc4;background:#e6efe9;border-radius:8px;padding:6px 7px"><div style="font-size:10.5px;color:#1a7a3c;font-weight:700;text-align:center">✓ Todo cubierto</div>'+extraHtml+'</div>';
   }
   let note='';
   if(oc.noMT.length)note+=`<div style="font-size:9.5px;color:#c0392b;margin-top:4px">⚠ Cobertura incompleta: ${oc.noMT.length} patente(s) sin MT3 (${oc.noMT.slice(0,4).join(', ')}${oc.noMT.length>4?'…':''}). Cargá el Maestro con la columna MT3.</div>`;
