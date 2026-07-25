@@ -480,13 +480,16 @@ function pivotHoja1(rows,iO,iPat,iVol,iCol2,iDir,patOf){
 async function dlPlanFmt(){
   const pp=await readPreplani();
   if(!pp){toast('No hay pre-planilla del día. Subíla en la pestaña Malla (⬆ Pre-planilla).',1);return;}
+  // Patente por orden = de la SECUENCIA (cada chofer secuenció sus órdenes exactas); si la orden no está secuenciada, cae a la zona de la malla.
+  const seqRows=await sbGet(`jornada=eq.${JORNADA}&chofer=neq.__PLANILLA__&select=chofer,data`);
+  const ordPat={};(seqRows||[]).forEach(r=>{const seq=(r.data&&r.data.seq)||[];seq.forEach(o=>{const s=String(o).trim();if(!s)return;if(!ordPat[s])ordPat[s]=r.chofer;const no=normOrd(s);if(no&&!ordPat[no])ordPat[no]=r.chofer;});});
   const {asign,dayK}=await mallaAsignDia();const zmap=zonaPatMap(asign,dayK);
-  const patOf=r=>patDeZona(zmap,matchZona(pp.iCom>=0?r[pp.iCom]:'')||'');   // patente = la de la malla según la zona de la comuna
-  const nZ=Object.keys(zmap).length;
+  const patOf=r=>{const o=String(r[pp.iO]||'').trim();return ordPat[o]||ordPat[normOrd(o)]||patDeZona(zmap,matchZona(pp.iCom>=0?r[pp.iCom]:'')||'');};
+  const nP=new Set(Object.values(ordPat)).size;
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rptSheetAoa(pp,pp.rows,patOf)),'Rpt. HojasRutas');
   XLSX.writeFile(wb,'Planificacion_Rosen_'+mallaDayStamp()+'.xlsx');
-  toast(nZ?('Planificación descargada (patente de la malla)'):'Planificación descargada · OJO: malla vacía, sin patentes',nZ?0:1);
+  toast('Planificación descargada'+(nP?(' · '+nP+' patentes de secuencia'):' · patente por malla'));
 }
 // #21 · Descarga BAJADAS archivo PURO (órdenes de la pre-plani que ningún chofer secuenció).
 async function dlBajadas(){
