@@ -107,6 +107,10 @@
     </div>
     <div id="sup-tools" class="hidden">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><span style="font-size:12px;color:#545454">Sesión: <b id="rol-lbl" style="color:#002E5D"></b></span><button class="btn bg" style="padding:5px 10px;font-size:12px" onclick="supLogout()">Cerrar sesión</button></div>
+      <div class="subtabs" style="margin-bottom:8px">
+        <button id="bt-rosen" class="on" onclick="setBrand('rosen')">🔵 Rosen</button>
+        <button id="bt-canon" onclick="setBrand('canon')">🟠 Canon</button>
+      </div>
       <div class="subtabs">
         <button id="st-b-seq" class="on" onclick="subTab('seq')">📋 Secuencia de ruta</button>
         <button id="st-b-malla" onclick="subTab('malla')">🗓 Malla de rotación</button>
@@ -125,9 +129,12 @@
           </div>
           <div id="estado"><div class="empty">Sube la planificación o toca “Actualizar”.</div></div>
           <div class="actions">
-            <button class="btn b2" onclick="descargar()">⬇ Descargar secuencia<span id="dl-lote-lbl"></span></button>
+            <button class="btn b2" onclick="dlRutaFmt()">⬇ Ruta (chofer)<span id="dl-lote-lbl"></span></button>
+            <button class="btn b1" onclick="dlPlanFmt()">⬇ Planificación</button>
+            <button class="btn bg" onclick="dlBajadas()">⬇ Bajadas</button>
             <button class="btn bg" onclick="limpiarJornada()">🗑 <span id="limpiar-lbl">Limpiar jornada (nuevo día)</span></button>
           </div>
+          <div class="hint"><b>Ruta</b>: formato simple por patente para el chofer (completa Centro/Comuna/HR cruzando con la pre-planilla). <b>Planificación</b>: idéntica al archivo del cliente (Hoja1 + Rpt. HojasRutas). <b>Bajadas</b>: archivo puro con las órdenes que estaban en la pre-planilla y ningún chofer secuenció. (Planificación/Bajadas usan la pre-planilla subida en la pestaña Malla.)</div>
         </div>
       </div>
 
@@ -135,19 +142,13 @@
         <div class="card">
           <label>Operación y semana</label>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
-            <select id="malla-op" onchange="loadMalla()" style="flex:1;min-width:150px">
-              <option value="">— elige operación —</option>
-              <option value="rosen-vina">Rosen Viña</option>
-              <option value="canon-vina">Canon Viña</option>
-              <option value="canon-rm">Canon RM</option>
-              <option value="rosen-serena">Rosen Serena</option>
-              <option value="canon-serena">Canon Serena</option>
-            </select>
+            <select id="malla-op" onchange="loadMalla()" style="flex:1;min-width:150px"></select>
             <input type="week" id="malla-week" onchange="loadMalla()" style="flex:1;min-width:150px">
           </div>
           <div id="malla-weeklbl" class="hint" style="margin-top:6px"></div>
+          <div id="malla-daysel" style="margin-top:8px"></div>
           <div class="actions">
-            <label class="btn b1" style="cursor:pointer">⬆ Pre-planilla<input type="file" id="malla-file" accept=".xlsx,.xls" onchange="subirPreplany(event)" style="display:none"></label>
+            <label class="btn b1" id="malla-preplani-lbl" style="cursor:pointer">⬆ Pre-planilla<input type="file" id="malla-file" accept=".xlsx,.xls" onchange="subirPreplany(event)" style="display:none"></label>
             <label class="btn bg" style="cursor:pointer">⚙ Maestro<input type="file" id="maestro-file" accept=".xlsx,.xls" onchange="subirMaestro(event)" style="display:none"></label>
             <button class="btn bg" onclick="loadMalla()">↻ Actualizar información</button>
             <button class="btn bok" onclick="saveMalla(true)">💾 Guardar</button>
@@ -157,15 +158,18 @@
 
         <div id="malla-body" class="split2 hidden">
           <div class="card" id="malla-left" style="flex:0 0 200px">
-            <label>Capacidades por zona <button class="btn bg" style="float:right;padding:3px 8px;font-size:10.5px" onclick="eliminarCarga()" title="Eliminar carga">🗑</button></label>
+            <label>Capacidades por zona <button class="btn bg" style="float:right;padding:3px 8px;font-size:10.5px" onclick="eliminarCarga()" title="Eliminar carga">🗑</button><button class="btn bg" style="float:right;padding:3px 8px;font-size:10.5px;margin-right:4px" onclick="addComManual()" title="Agregar comuna a una zona (permanente)">➕ comuna</button></label>
             <div id="malla-fcarga" class="hint" style="margin-top:0;margin-bottom:6px"></div>
             <div id="malla-vol"></div>
+            <div id="malla-cap" style="margin-top:8px"></div>
+            <div id="malla-extra" style="margin-top:8px"></div>
             <div id="malla-sin" style="margin-top:8px"></div>
           </div>
           <div class="card" id="malla-right" style="flex:1;min-width:0">
             <label>Malla semanal <button class="btn bg" style="float:right;padding:4px 9px;font-size:11px" onclick="vaciarMalla()">🗑 Vaciar</button></label>
             <div id="malla-grid"></div>
-            <div class="hint">Punto naranja = baja rotación · candado = día cerrado · “orig” en una celda = lo proyectado antes de tu cambio.</div>
+            <div class="hint">Cada día tiene 2 recuadritos: <b>arriba la zona principal</b>, abajo la secundaria (ahí cae el excedente del camión). Punto naranja = baja rotación · candado = día cerrado.</div>
+            <div id="malla-hist" style="margin-top:10px"></div>
           </div>
         </div>
         <div id="malla-empty" class="card"><div class="empty">Elegí una operación para ver su malla.</div></div>
@@ -196,6 +200,7 @@
     </div>
   </div>
 
+  <div id="day-pop" style="display:none;position:fixed;z-index:20;max-width:280px;background:#fff;border:1px solid #cdd6df;border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.18);padding:10px 12px;font-size:11.5px;color:#1a1d2e"></div>
   <div class="toast" id="toast"></div>
 <script>
 // ===== Supabase (misma nube del portal) =====
@@ -231,7 +236,7 @@ function renderSup(){
   $('sup-login').classList.toggle('hidden',supAuth);
   $('sup-tools').classList.toggle('hidden',!supAuth);
   const rl=$('rol-lbl');if(rl)rl.textContent=supAuth?(esAdmin()?'Administrador':'Supervisor'):'';
-  if(supAuth)cargarEstado();
+  if(supAuth){setBrand(BRAND||'rosen');cargarEstado();}
 }
 function setMode(m){
   $('m-sup').classList.toggle('on',m==='sup');$('m-cho').classList.toggle('on',m==='cho');
@@ -256,15 +261,20 @@ function subirExcel(e){
       const iC=find('nombre contacto','cliente','contacto');
       const iD=find('direccion','dirección'), iCom=find('comuna');
       const iLat=find('latitud','lat'), iLng=find('longitud','lng','lon');
+      const iCentro=find('centro'),iHora=find('hora'),iHR=find('hr'),iCond=find('chofer','conductor'); // #16 · extras para formato Ruta
       if(iO<0){toast('No encontré la columna de N° de guía/orden',1);return;}
       const filas=d.slice(1).filter(r=>String(r[iO]||'').trim());
       const byCh={},seen={};
       filas.forEach(r=>{
         const orden=String(r[iO]).trim(),chofer=String(r[iCh]||'').trim()||'(sin patente)';
         const k=chofer+'||'+orden;if(seen[k])return;seen[k]=1;
-        const dir=[String(iD>=0?r[iD]:'').trim(),String(iCom>=0?r[iCom]:'').trim()].filter(Boolean).join(', ');
+        const dirRaw=String(iD>=0?r[iD]:'').trim(),comRaw=String(iCom>=0?r[iCom]:'').trim();
+        const dir=[dirRaw,comRaw].filter(Boolean).join(', ');
         const lat=iLat>=0?String(r[iLat]||'').trim():'', lng=iLng>=0?String(r[iLng]||'').trim():'';
-        (byCh[chofer]=byCh[chofer]||[]).push({orden,cliente:String(iC>=0?r[iC]:'').trim(),direccion:dir,lat,lng});
+        (byCh[chofer]=byCh[chofer]||[]).push({orden,cliente:String(iC>=0?r[iC]:'').trim(),direccion:dir,lat,lng,
+          // #16 · campos crudos por parada para armar el formato Ruta sin depender del archivo original
+          centro:String(iCentro>=0?r[iCentro]:'').trim(),dir:dirRaw,comuna:comRaw,
+          hora:String(iHora>=0?r[iHora]:'').trim(),hr:String(iHR>=0?r[iHR]:'').trim(),cond:String(iCond>=0?r[iCond]:'').trim()});
       });
       const lote=(f.name||'').replace(/\.[^.]+$/,'').replace(/[_]+/g,' ').trim()||'Sin nombre'; // etiqueta = nombre del archivo (ej. "Rosen V")
       const rows=[];
@@ -335,38 +345,118 @@ async function limpiarJornada(){
   toast('Jornada limpiada — sube la planificación del día'); cargarEstado();
 }
 
-// ---------- SUPERVISOR: descargar (solo Patente, Orden, Secuencia) ----------
-async function descargar(){
+// ---------- SUPERVISOR: descargar (#16/#18/#21 · Ruta + Planificación tal cual + Bajadas puro) ----------
+function fstamp(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+// #18 · lee el DETALLE crudo de la pre-planilla del día (para cruce y descargas). Devuelve {head,rows,índices} o null.
+async function readPreplani(){
+  const rows=await sbGet(`jornada=eq.${encodeURIComponent('preplani:'+JORNADA)}&chofer=eq.__DET__&select=data`);
+  if(!rows||!rows.length||!rows[0].data||!rows[0].data.head)return null;
+  const head=rows[0].data.head,rws=rows[0].data.rows||[];
+  const hl=head.map(x=>String(x).trim().toLowerCase());
+  const col=(...n)=>{for(const x of n){const i=hl.findIndex(h=>h===x||h.includes(x));if(i>=0)return i;}return -1;};
+  const iPatH=hl.findIndex(h=>h==='columna3');
+  return {head,rows:rws,iO:col('nro.f12','numero guia','guia','orden'),iPat:(iPatH>=0?iPatH:head.length-1),
+    iCom:col('comuna'),iVol:col('volumen','volúmen'),iCol2:col('columna2'),iDir:col('direccion','dirección'),
+    iCentro:col('centro'),iHR:hl.findIndex(h=>h==='hr'),iHora:col('hora'),iCli:col('cliente','contacto'),
+    iCant:col('cantidad ruta','cantidad'),iDescMat:col('descripcion mat','descripción mat','material'),iDesc:col('descripción','descripcion')};
+}
+// #Planif · volumen ajustado según la fórmula de Malla (retiro 006/_REC→0, sofá +1 m³ por unidad, sin dividir)
+function adjVolRow(pp,r){
+  const orden=String(r[pp.iO]||'').trim().toUpperCase();const retiro=orden.startsWith('006')||/_REC$/.test(orden);
+  const cant=parseFloat(String(pp.iCant>=0?r[pp.iCant]:'1').replace(',','.'))||1;
+  const volBase=parseFloat(String(pp.iVol>=0?r[pp.iVol]:'0').replace(',','.'))||0;
+  const dm=[pp.iDescMat,pp.iDesc].filter(x=>x>=0).map(x=>normC(r[x])).join(' ');const sofa=dm.includes('SOFA')?cant:0;
+  return retiro?0:(volBase+sofa);
+}
+// Rpt. HojasRutas con columnas A–Q + R(Volumen ajustado) + S(Patente)
+function rptSheetAoa(pp,rows){
+  const n=17;const head=pp.head.slice(0,n).concat(['Volumen (ajustado)','Patente']);
+  const aoa=[head];rows.forEach(r=>aoa.push(r.slice(0,n).concat([+adjVolRow(pp,r).toFixed(3),String(r[pp.iPat]||'').trim()])));
+  return aoa;
+}
+// Mapa orden → datos ricos (centro/comuna/hr/…) desde la pre-planilla, para completar el formato Ruta (#18).
+function crossFromPreplani(pp){const m={};if(!pp)return m;pp.rows.forEach(r=>{const o=String(r[pp.iO]||'').trim();if(!o||m[o])return;m[o]={centro:pp.iCentro>=0?String(r[pp.iCentro]||'').trim():'',com:pp.iCom>=0?String(r[pp.iCom]||'').trim():'',hr:pp.iHR>=0?String(r[pp.iHR]||'').trim():'',hora:pp.iHora>=0?String(r[pp.iHora]||'').trim():'',cli:pp.iCli>=0?String(r[pp.iCli]||'').trim():'',dir:pp.iDir>=0?String(r[pp.iDir]||'').trim():''};});return m;}
+// Hoja tipo RUTA (formato chofer) para una patente, completando datos con el cruce de la pre-planilla.
+function hojaRuta(r,cross){
+  cross=cross||{};
+  const paradas=(r.data&&r.data.paradas)||[];
+  const seq=(r.data&&r.data.seq)||paradas.map(p=>p.orden);
+  if(!seq.length)return null;
+  const byOrd={};paradas.forEach(p=>byOrd[p.orden]=p);
+  const aoa=[['Centro','Nro.F12','Cliente','Dirección','Comuna','Hora','HR','Patente','Secuencia']];
+  let cond='';
+  seq.forEach((orden,i)=>{const p=byOrd[orden]||{},x=cross[String(orden).trim()]||{};if(p.cond&&!cond)cond=p.cond;
+    aoa.push([p.centro||x.centro||'',orden,p.cliente||x.cli||'',p.dir||p.direccion||x.dir||'',p.comuna||x.com||'',p.hora||x.hora||'',p.hr||x.hr||'',r.chofer,i+1]);});
+  aoa.push([]);aoa.push(['','CONDUCTOR',cond||'']);aoa.push(['','PATENTE',r.chofer]);
+  aoa.push(['','AYUDANTE','']);aoa.push(['','FONO','']);
+  const name=(r.chofer||'ruta').replace(/[^0-9A-Za-z]/g,'').slice(0,31)||'RUTA';
+  return {aoa,name};
+}
+const RUTACOLS=[{wch:22},{wch:22},{wch:24},{wch:34},{wch:16},{wch:14},{wch:10},{wch:10},{wch:9}];
+// Formato RUTA: una hoja por patente (respeta el lote filtrado). Cruza con la pre-planilla (#18).
+async function dlRutaFmt(){
   const all=await sbGet(`jornada=eq.${JORNADA}&select=chofer,data&chofer=neq.__PLANILLA__`);
   if(!all||!all.length){toast('No hay datos para descargar',1);return;}
-  const f=($('lote-filtro')&&$('lote-filtro').value)||'';   // si hay lote elegido, baja solo ese
+  const f=($('lote-filtro')&&$('lote-filtro').value)||'';
   const sel=f?all.filter(r=>loteDe(r)===f):all;
   if(!sel.length){toast('No hay patentes en ese lote',1);return;}
-  const aoa=[['Patente','Orden','Secuencia']];
+  const cross=crossFromPreplani(await readPreplani());
+  const wb=XLSX.utils.book_new();let n=0;const used={};
   sel.sort((a,b)=>a.chofer.localeCompare(b.chofer)).forEach(r=>{
-    const seq=(r.data&&r.data.seq)||[];
-    seq.forEach((orden,i)=>aoa.push([r.chofer,orden,i+1]));
+    const h=hojaRuta(r,cross);if(!h)return;let nm=h.name;while(used[nm])nm=(nm.slice(0,28)+(++used[h.name]||''));used[nm]=1;
+    const ws=XLSX.utils.aoa_to_sheet(h.aoa);ws['!cols']=RUTACOLS;XLSX.utils.book_append_sheet(wb,ws,nm);n++;
   });
-  if(aoa.length<2){toast('Aún no hay secuencias cargadas por los choferes',1);return;}
-  const ws=XLSX.utils.aoa_to_sheet(aoa),wb=XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb,ws,'Secuencia');
-  const d=new Date();
+  if(!n){toast('Aún no hay secuencias cargadas por los choferes',1);return;}
   const tag=f?'_'+f.replace(/[^0-9A-Za-z]+/g,'-').replace(/^-|-$/g,''):'';
-  XLSX.writeFile(wb,'Secuencia_Rosen'+tag+'_'+d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')+'.xlsx');
-  toast(f?('Descargado lote: '+f):'Excel descargado: Patente, Orden, Secuencia');
+  XLSX.writeFile(wb,'Ruta_Rosen'+tag+'_'+fstamp()+'.xlsx');
+  toast('Ruta descargada ('+n+' patentes)'+(Object.keys(cross).length?'':' · sin pre-plani para cruzar'));
 }
-// Descargar la secuencia de UNA patente (para bajarlas a medida que se cierran)
+// Descargar el formato RUTA de UNA patente (botón ⬇ del estado).
 async function descargarRuta(ch){
   const rr=await sbGet(`jornada=eq.${JORNADA}&chofer=eq.${encodeURIComponent(ch)}&select=chofer,data`);
   if(!rr||!rr.length){toast('No encontré la ruta',1);return;}
-  const seq=(rr[0].data&&rr[0].data.seq)||[];
-  if(!seq.length){toast('Esa patente aún no tiene secuencia',1);return;}
-  const aoa=[['Patente','Orden','Secuencia']];seq.forEach((orden,i)=>aoa.push([ch,orden,i+1]));
-  const ws=XLSX.utils.aoa_to_sheet(aoa),wb=XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb,ws,'Secuencia');
-  const d=new Date();
-  XLSX.writeFile(wb,'Secuencia_'+ch.replace(/[^0-9A-Za-z]/g,'')+'_'+d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')+'.xlsx');
-  toast('Descargada secuencia de '+ch);
+  const cross=crossFromPreplani(await readPreplani());
+  const h=hojaRuta(rr[0],cross);if(!h){toast('Esa patente aún no tiene secuencia',1);return;}
+  const ws=XLSX.utils.aoa_to_sheet(h.aoa);ws['!cols']=RUTACOLS;
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,h.name);
+  XLSX.writeFile(wb,'Ruta_'+ch.replace(/[^0-9A-Za-z]/g,'')+'_'+fstamp()+'.xlsx');
+  toast('Descargada ruta de '+ch);
+}
+// #21 · Hoja1 dinámica por patente (Columna3): recuento distinto Nro.F12/Dirección + Σ Volumen/Columna2 + Total general.
+function pivotHoja1(rows,iO,iPat,iVol,iCol2,iDir){
+  const piv={},order=[];
+  rows.forEach(r=>{const pat=String(r[iPat]||'').trim();if(!pat)return;
+    if(!piv[pat]){piv[pat]={ord:new Set(),dir:new Set(),vol:0,col2:0};order.push(pat);}
+    const b=piv[pat];b.ord.add(String(r[iO]||'').trim());b.dir.add(iDir>=0?String(r[iDir]||'').trim():'');
+    b.vol+=parseFloat(String(iVol>=0?r[iVol]:0).replace(',','.'))||0;b.col2+=parseFloat(String(iCol2>=0?r[iCol2]:0).replace(',','.'))||0;});
+  const h1=[[],[],['Etiquetas de fila','Recuento distinto de Nro.F12','Recuento distinto de Dirección','Suma de Volumen','Suma de Columna2']];
+  let tO=0,tD=0,tV=0,tC=0;
+  order.sort().forEach(pat=>{const b=piv[pat];h1.push([pat,b.ord.size,b.dir.size,+b.vol.toFixed(3),+b.col2.toFixed(3)]);tO+=b.ord.size;tD+=b.dir.size;tV+=b.vol;tC+=b.col2;});
+  h1.push(['Total general',tO,tD,+tV.toFixed(3),+tC.toFixed(3)]);
+  return h1;
+}
+// #21/#Planif · Descarga PLANIFICACIÓN: hoja Rpt. HojasRutas con A–Q + R(Volumen ajustado, fórmula Malla) + S(Patente). Sin Hoja1.
+async function dlPlanFmt(){
+  const pp=await readPreplani();
+  if(!pp){toast('No hay pre-planilla del día. Subíla en la pestaña Malla (⬆ Pre-planilla).',1);return;}
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rptSheetAoa(pp,pp.rows)),'Rpt. HojasRutas');
+  XLSX.writeFile(wb,'Planificacion_Rosen_'+fstamp()+'.xlsx');
+  toast('Planificación descargada');
+}
+// #21 · Descarga BAJADAS archivo PURO (órdenes de la pre-plani que ningún chofer secuenció).
+async function dlBajadas(){
+  const pp=await readPreplani();
+  if(!pp){toast('No hay pre-planilla del día para calcular bajadas.',1);return;}
+  const all=await sbGet(`jornada=eq.${JORNADA}&select=chofer,data&chofer=neq.__PLANILLA__`);
+  const seqSet={};(all||[]).forEach(r=>{const seq=(r.data&&r.data.seq)||[];seq.forEach(o=>seqSet[String(o).trim()]=1);});
+  const bajRows=pp.rows.filter(r=>{const o=String(r[pp.iO]||'').trim();return o&&!seqSet[o];});
+  if(!bajRows.length){toast('Sin bajadas: todas las órdenes fueron secuenciadas ✓');return;}
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(pivotHoja1(bajRows,pp.iO,pp.iPat,pp.iVol,pp.iCol2,pp.iDir)),'Hoja1');
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rptSheetAoa(pp,bajRows)),'Rpt. HojasRutas');
+  XLSX.writeFile(wb,'Bajadas_Rosen_'+fstamp()+'.xlsx');
+  toast('Bajadas descargadas · '+bajRows.length+' líneas');
 }
 
 // ---------- CHOFER ----------
@@ -462,35 +552,97 @@ async function cerrar(){
   const ok=await sbUpsert([{jornada:JORNADA,chofer:curChofer,data:{paradas:items,seq:items.map(p=>p.orden),lote:curLote},cerrada:true}]);
   if(ok){curCerrada=true;render();toast('Ruta cerrada 🔒');}
 }
+// ================= MARCAS (#26): Rosen (malla+secuencia) / Canon (solo malla, como está) =================
+let BRAND='rosen';
+function brandOps(b){return b==='canon'?[['canon-rm','Canon RM'],['canon-vina','Canon Viña']]:[['rosen-vina','Rosen Viña']];}
+function isRosenOp(){return (MALLA.op||'').indexOf('rosen')===0;}   // las mejoras nuevas de malla son SOLO Rosen
+function setBrand(b){
+  BRAND=b;
+  $('bt-rosen').classList.toggle('on',b==='rosen');
+  $('bt-canon').classList.toggle('on',b==='canon');
+  $('st-b-seq').style.display=(b==='rosen')?'':'none';                                   // la Secuencia es exclusiva de Rosen
+  const pre=$('malla-preplani-lbl');if(pre)pre.style.display=(b==='rosen')?'':'none';     // Canon no sube pre-plani
+  const sel=$('malla-op');const ops=brandOps(b);
+  sel.innerHTML=ops.map(([v,l])=>`<option value="${v}">${l}</option>`).join('');
+  sel.value=ops[0][0];
+  if(b==='canon')subTab('malla'); else subTab('seq');
+}
 // ================= MALLA DE ROTACIÓN =================
 function subTab(t){
   $('st-b-seq').classList.toggle('on',t==='seq');$('st-b-malla').classList.toggle('on',t==='malla');
   $('st-seq').classList.toggle('hidden',t!=='seq');$('st-malla').classList.toggle('hidden',t!=='malla');
-  if(t==='malla')loadMaestro().then(loadMalla);
+  if(t==='malla')loadC2Z().then(loadMaestro).then(loadMalla);
 }
 const DIAS=[['L','Lun'],['M','Mar'],['X','Mié'],['J','Jue'],['V','Vie'],['S','Sáb']];
 const MESC=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
-const ZONAS={'rosen-vina':[['VN','Viña del Mar'],['QV','Quilpué/V.Alemana'],['VL','Valparaíso'],['CR','Concón/Reñaca'],['LO','Limache/Olmué'],['IN','Interior'],['CNR','Costa N. lejana'],['CNU','Costa N. cercano'],['STS','Serv. técnico'],['ES','Especial'],['N/D','No disp.'],['N/C','No citado']]};
+const ZONAS={'rosen-vina':[['VN','Viña del Mar'],['QV','Quilpué/V.Alemana'],['VL','Valparaíso'],['CR','Concón/Reñaca'],['LO','Limache/Olmué'],['IN','Interior'],['CNR','Costa N. lejana'],['CNU','Costa N. cercano'],['LI','Litoral'],['STS','Serv. técnico'],['ES','Especial'],['N/D','No disp.'],['N/C','No citado']]};
 ZONAS['canon-vina']=ZONAS['rosen-vina'];
 ZONAS['canon-rm']=[['CEN','Centro'],['OTE','Oriente'],['SOR','Suroriente'],['SUR','Sur'],['NTE','Norte'],['NP','Norponiente'],['PON','Poniente'],['RUR','Rural'],['FR','Rural Frecuencia'],['STS','Serv. técnico'],['ES','Especial'],['N/D','No disp.'],['N/C','No citado']];
 ZONAS['rosen-serena']=[['US','Urbano Serena'],['UC','Urbano Coquimbo'],['VS','Valle Serena'],['OV','Ovalle'],['INC','Interior/Valle'],['AN','Andacollo'],['CC','Costa Coquimbo'],['TDA','Tienda Serena'],['ES','Especial'],['N/D','No disp.'],['N/C','No citado']];
 ZONAS['canon-serena']=ZONAS['rosen-serena'];
-const ZCOLOR={VN:'#2F5277',QV:'#3E6B96',VL:'#5B6B7A',CR:'#4E8C8C',LO:'#6E8F5E',IN:'#D9B65C',CNR:'#B5705C',CNU:'#E0A36B',ES:'#8A7898','N/D':'#E3E1D9','N/C':'#F0EEE7',CEN:'#2F5277',OTE:'#5B6B7A',SOR:'#E0A36B',SUR:'#B5705C',NTE:'#4E8C8C',NP:'#3E6B96',PON:'#D9B65C',RUR:'#6E8F5E',FR:'#7E6A8A',US:'#2F5277',UC:'#4E8C8C',VS:'#6E8F5E',OV:'#3E6B96',INC:'#D9B65C',AN:'#8A7898',CC:'#B5705C',STS:'#9B5B6B',TDA:'#6E5B8A'};
+const ZCOLOR={VN:'#2F5277',QV:'#3E6B96',VL:'#5B6B7A',CR:'#4E8C8C',LO:'#6E8F5E',IN:'#D9B65C',CNR:'#B5705C',CNU:'#E0A36B',LI:'#5FA8A0',ES:'#8A7898','N/D':'#E3E1D9','N/C':'#F0EEE7',CEN:'#2F5277',OTE:'#5B6B7A',SOR:'#E0A36B',SUR:'#B5705C',NTE:'#4E8C8C',NP:'#3E6B96',PON:'#D9B65C',RUR:'#6E8F5E',FR:'#7E6A8A',US:'#2F5277',UC:'#4E8C8C',VS:'#6E8F5E',OV:'#3E6B96',INC:'#D9B65C',AN:'#8A7898',CC:'#B5705C',STS:'#9B5B6B',TDA:'#6E5B8A'};
 function zfg(z){return (z==='N/D'||z==='N/C')?'#8A8780':'#fff';}
-const COMUNA2ZONA={'VINA DEL MAR':'VN','VINA':'VN','QUILPUE':'QV','VILLA ALEMANA':'QV','EL BELLOTO':'QV','BELLOTO':'QV','VALPARAISO':'VL','CURAUMA':'VL','CONCON':'CR','RENACA':'CR','LIMACHE':'LO','OLMUE':'LO','QUILLOTA':'IN','LA CRUZ':'IN','LA CALERA':'IN','CALERA':'IN','NOGALES':'IN','HIJUELAS':'IN','EL MELON':'IN','MELON':'IN','LLAY LLAY':'IN','LLAYLLAY':'IN','CATEMU':'IN','PANQUEHUE':'IN','SAN FELIPE':'IN','PUTAENDO':'IN','SANTA MARIA':'IN','RINCONADA':'IN','CALLE LARGA':'IN','LOS ANDES':'IN','SAN ESTEBAN':'IN','QUILLOTA':'IN','LA CRUZ':'IN','LA LIGUA':'CNR','CABILDO':'CNR','PAPUDO':'CNR','ZAPALLAR':'CNR','PETORCA':'CNR','QUINTERO':'CNU','PUCHUNCAVI':'CNU','HORCON':'CNU','HORCONES':'CNU','ORCON':'CNU','ORCONES':'CNU','HORCONES DE CONCON':'CNU','COQUIMBO':'UC','LA SERENA':'US','PAIGUANO':'VS','VICUNA':'VS','COMBARBALA':'INC','MONTE PATRIA':'INC','PUNITAQUI':'INC','RIO HURTADO':'INC','SOTAQUI':'INC','ILLAPEL':'INC','ILAPEL':'INC','YLLAPEL':'INC','ILLLAPEL':'INC','ANDACOLLO':'AN','GUANAQUEROS':'CC','LAS TACAS':'CC','PUERTO VELERO':'CC','TONGOY':'CC','TOTORALILLO':'CC','OVALLE':'OV','ESTACION CENTRAL':'CEN','PROVIDENCIA':'CEN','QUINTA NORMAL':'CEN','SAN JOAQUIN':'CEN','SAN MIGUEL':'CEN','SANTIAGO':'CEN','CERRO NAVIA':'NP','LO PRADO':'NP','PUDAHUEL':'NP','QUILICURA':'NP','RENCA':'NP','COLINA':'FR','LAMPA':'FR','CONCHALI':'NTE','HUECHURABA':'NTE','INDEPENDENCIA':'NTE','RECOLETA':'NTE','TILTIL':'RUR','ALHUE':'RUR','CURACAVI':'RUR','EL MONTE':'RUR','ISLA DE MAIPO':'RUR','MARIA PINTO':'RUR','MELIPILLA':'RUR','SAN PEDRO':'RUR','TALAGANTE':'RUR','CALERA DE TANGO':'RUR','PIRQUE':'RUR','SAN JOSE DE MAIPO':'RUR','LA REINA':'OTE','LAS CONDES':'OTE','LO BARNECHEA':'OTE','NUNOA':'OTE','VITACURA':'OTE','CERRILLOS':'PON','CERRILOS':'PON','MAIPU':'PON','PADRE HURTADO':'PON','PENAFLOR':'PON','EL BOSQUE':'SUR','LA GRANJA':'SUR','LO ESPEJO':'SUR','PEDRO AGUIRRE CERDA':'SUR','SAN BERNARDO':'SUR','BUIN':'SUR','LA CISTERNA':'SUR','LA PINTANA':'SUR','PAINE':'SUR','SAN RAMON':'SUR','LA FLORIDA':'SOR','MACUL':'SOR','PENALOLEN':'SOR','PUENTE ALTO':'SOR'};
-const ZREG={vina:new Set(['VN','QV','VL','CR','LO','IN','CNR','CNU']),serena:new Set(['US','UC','VS','OV','INC','AN','CC']),rm:new Set(['CEN','OTE','SOR','SUR','NTE','NP','PON','RUR','FR'])};
+const COMUNA2ZONA={'VINA DEL MAR':'VN','VINA':'VN','QUILPUE':'QV','VILLA ALEMANA':'QV','EL BELLOTO':'QV','BELLOTO':'QV','VALPARAISO':'VL','CURAUMA':'VL','CONCON':'CR','RENACA':'CR','LIMACHE':'LO','OLMUE':'LO','QUILLOTA':'IN','LA CRUZ':'IN','LA CALERA':'IN','CALERA':'IN','NOGALES':'IN','HIJUELAS':'IN','EL MELON':'IN','MELON':'IN','LLAY LLAY':'IN','LLAYLLAY':'IN','CATEMU':'IN','PANQUEHUE':'IN','SAN FELIPE':'IN','PUTAENDO':'IN','SANTA MARIA':'IN','RINCONADA':'IN','CALLE LARGA':'IN','LOS ANDES':'IN','SAN ESTEBAN':'IN','QUILLOTA':'IN','LA CRUZ':'IN','LA LIGUA':'CNR','CABILDO':'CNR','PAPUDO':'CNR','ZAPALLAR':'CNR','PETORCA':'CNR','QUINTERO':'CNU','PUCHUNCAVI':'CNU','HORCON':'CNU','HORCONES':'CNU','ORCON':'CNU','ORCONES':'CNU','HORCONES DE CONCON':'CNU','COQUIMBO':'UC','LA SERENA':'US','PAIGUANO':'VS','VICUNA':'VS','COMBARBALA':'INC','MONTE PATRIA':'INC','PUNITAQUI':'INC','RIO HURTADO':'INC','SOTAQUI':'INC','ILLAPEL':'INC','ILAPEL':'INC','YLLAPEL':'INC','ILLLAPEL':'INC','ANDACOLLO':'AN','GUANAQUEROS':'CC','LAS TACAS':'CC','PUERTO VELERO':'CC','TONGOY':'CC','TOTORALILLO':'CC','OVALLE':'OV','ESTACION CENTRAL':'CEN','PROVIDENCIA':'CEN','QUINTA NORMAL':'CEN','SAN JOAQUIN':'CEN','SAN MIGUEL':'CEN','SANTIAGO':'CEN','CERRO NAVIA':'NP','LO PRADO':'NP','PUDAHUEL':'NP','QUILICURA':'NP','RENCA':'NP','COLINA':'FR','LAMPA':'FR','CONCHALI':'NTE','HUECHURABA':'NTE','INDEPENDENCIA':'NTE','RECOLETA':'NTE','TILTIL':'RUR','ALHUE':'RUR','CURACAVI':'RUR','EL MONTE':'RUR','ISLA DE MAIPO':'RUR','MARIA PINTO':'RUR','MELIPILLA':'RUR','SAN PEDRO':'RUR','TALAGANTE':'RUR','CALERA DE TANGO':'RUR','PIRQUE':'RUR','SAN JOSE DE MAIPO':'RUR','LA REINA':'OTE','LAS CONDES':'OTE','LO BARNECHEA':'OTE','NUNOA':'OTE','VITACURA':'OTE','CERRILLOS':'PON','CERRILOS':'PON','MAIPU':'PON','PADRE HURTADO':'PON','PENAFLOR':'PON','EL BOSQUE':'SUR','LA GRANJA':'SUR','LO ESPEJO':'SUR','PEDRO AGUIRRE CERDA':'SUR','SAN BERNARDO':'SUR','BUIN':'SUR','LA CISTERNA':'SUR','LA PINTANA':'SUR','PAINE':'SUR','SAN RAMON':'SUR','LA FLORIDA':'SOR','MACUL':'SOR','PENALOLEN':'SOR','PUENTE ALTO':'SOR',
+// #14 · Localidades V Región (Viña) ampliadas — reducir "sin comuna"
+'CACHAGUA':'CNR','LOS MOLLES':'CNR','PICHIDANGUI':'CNR','LONGOTOMA':'CNR','GUANGALI':'CNR','LA BALLENA':'CNR','PULLALLY':'CNR','VALLE HERMOSO':'CNR','LA CANELA':'CNR',
+'MAITENCILLO':'CNU','VENTANAS':'CNU','LAS VENTANAS':'CNU','LONCURA':'CNU','VALLE ALEGRE':'CNU','ARTIFICIO':'CNU','LOS MAITENES':'CNU','LA GREDA':'CNU','CAMPICHE':'CNU','LA CHOCOTA':'CNU',
+'PLACILLA':'VL','LAGUNA VERDE':'VL','PLAYA ANCHA':'VL','PLACERES':'VL','CERRO ALEGRE':'VL','RODELILLO':'VL',
+'LAS SALINAS':'CR','COCHOA':'VN','MIRAMAR':'VN','RECREO':'VN',
+'COLMO':'CR','TABOLANGO':'IN','LA PENA':'IN','SAN PEDRO DE QUILLOTA':'IN','ROMERAL':'IN','BOCO':'IN','PACHACAMITA':'IN','OCOA':'IN','LOS ANDES':'IN','RIO BLANCO':'IN','GUARDIA VIEJA':'IN',
+// #15 · Zona LI (Litoral central / Prov. San Antonio)
+'ALGARROBO':'LI','EL QUISCO':'LI','EL TABO':'LI','CARTAGENA':'LI','SAN ANTONIO':'LI','SANTO DOMINGO':'LI','CASABLANCA':'LI','QUINTAY':'LI','TUNQUEN':'LI','LAS CRUCES':'LI','ISLA NEGRA':'LI','LO ABARCA':'LI','MALVILLA':'LI','LEYDA':'LI','CUNCUMEN':'LI','LLOLLEO':'LI','SAN JUAN':'LI','MIRASOL':'LI','LO GALLARDO':'LI'};
+const ZREG={vina:new Set(['VN','QV','VL','CR','LO','IN','CNR','CNU','LI']),serena:new Set(['US','UC','VS','OV','INC','AN','CC']),rm:new Set(['CEN','OTE','SOR','SUR','NTE','NP','PON','RUR','FR'])};
 function normC(s){return(s||'').toString().toUpperCase().trim().normalize('NFD').replace(/[̀-ͯ]/g,'');}
 function keyComuna(raw){return normC(raw).replace(/[.\-_/]/g,' ').replace(/\s+/g,' ').trim();}
-// #1 índice tolerante: cada comuna en 3 formas (normal / sin artículo / sin espacios)
-const COMUNA_IDX={};
-for(const k in COMUNA2ZONA){const z=COMUNA2ZONA[k];const ck=keyComuna(k);[ck,ck.replace(/^(LA|EL|LOS|LAS) /,''),ck.replace(/ /g,'')].forEach(v=>{if(v&&!COMUNA_IDX[v])COMUNA_IDX[v]=z;});}
-function matchZona(raw){const c=keyComuna(raw);if(!c)return null;const cand=[c,c.replace(/^(LA|EL|LOS|LAS) /,''),c.replace(/ /g,'')];for(const k of cand){if(COMUNA_IDX[k])return COMUNA_IDX[k];}return null;}
+// #1/#20 índice tolerante (cada comuna en 3 formas) + overrides guardados por Pablo (comuna→zona), reconstruible en caliente.
+const COMUNA_IDX={};let COMUNA_KEYS=[];let C2Z_OVER={}; // overrides: keyComuna -> zona (ganan sobre el diccionario base)
+function rebuildComunaIdx(){
+  for(const k in COMUNA_IDX)delete COMUNA_IDX[k];
+  for(const k in COMUNA2ZONA){const z=COMUNA2ZONA[k];const ck=keyComuna(k);[ck,ck.replace(/^(LA|EL|LOS|LAS) /,''),ck.replace(/ /g,'')].forEach(v=>{if(v&&!COMUNA_IDX[v])COMUNA_IDX[v]=z;});}
+  for(const ck in C2Z_OVER){const z=C2Z_OVER[ck];[ck,ck.replace(/^(LA|EL|LOS|LAS) /,''),ck.replace(/ /g,'')].forEach(v=>{if(v)COMUNA_IDX[v]=z;});} // override gana
+  const base=Object.keys(COMUNA2ZONA).map(k=>({k:keyComuna(k),z:COMUNA2ZONA[k]}));
+  const ov=Object.keys(C2Z_OVER).map(k=>({k:keyComuna(k),z:C2Z_OVER[k]}));
+  COMUNA_KEYS=ov.concat(base).filter(o=>o.k.length>=4).sort((a,b)=>b.k.length-a.k.length);
+}
+rebuildComunaIdx();
+// #20 · persistencia de overrides comuna→zona en la nube
+async function loadC2Z(){const r=await sbGet(`jornada=eq.c2z&chofer=eq.__MAP__&select=data`);C2Z_OVER=(r&&r.length&&r[0].data&&r[0].data.map)?r[0].data.map:{};rebuildComunaIdx();}
+async function saveC2Z(){await sbUpsert([{jornada:'c2z',chofer:'__MAP__',data:{map:C2Z_OVER},cerrada:false}]);}
+// #20 · agregar/guardar comuna→zona (override permanente)
+function asignarZona(com,z){const zc=(z||'').toUpperCase().trim();const okZona=!!ZCOLOR[zc]||(ZONAS[MALLA.op]||[]).some(x=>x[0]===zc);if(!okZona){toast('Zona desconocida: '+zc,1);return false;}C2Z_OVER[keyComuna(com)]=zc;rebuildComunaIdx();saveC2Z();return true;}
+function asignarSin(comKey,z){if(!z)return;if(!asignarZona(comKey,z))return;const s=(MALLA.sinzona||{})[comKey];if(s){MALLA.vol[z]=(MALLA.vol[z]||0)+s.vol;MALLA.volg[z]=(MALLA.volg[z]||0)+s.g;MALLA.comdet[z]=MALLA.comdet[z]||{};MALLA.comdet[z][comKey]={vol:s.vol,g:s.g};delete MALLA.sinzona[comKey];}zonaExp=null;renderVol();renderGrid();saveMalla();toast('“'+comKey+'” → '+z+' (guardado permanente)');}
+function addComManual(){const c=prompt('Comuna a agregar al diccionario:');if(!c)return;const z=prompt('Código de zona (ej. LI, CNU, VN):');if(!z)return;if(asignarZona(c,z)){toast('Guardado: '+keyComuna(c)+' → '+z.toUpperCase().trim());renderVol();}}
+function matchZona(raw){
+  const c=keyComuna(raw);if(!c)return null;
+  // 1) match exacto en 3 formas (tal cual / sin artículo / sin espacios)
+  const cand=[c,c.replace(/^(LA|EL|LOS|LAS) /,''),c.replace(/ /g,'')];
+  for(const k of cand){if(COMUNA_IDX[k])return COMUNA_IDX[k];}
+  // 2) #14 fallback tolerante: la comuna viene embebida en texto (ej. "HORCON - PUCHUNCAVI", "ENTREGA CACHAGUA").
+  //    Buscamos la clave conocida MÁS LARGA que aparezca como palabra dentro del texto (evita falsos positivos cortos).
+  const cs=' '+c+' ';const cn=c.replace(/ /g,'');
+  for(const o of COMUNA_KEYS){
+    if(cs.includes(' '+o.k+' ')) return o.z;            // palabra completa
+    const on=o.k.replace(/ /g,'');
+    if(on.length>=5 && cn.includes(on)) return o.z;     // sin espacios, clave larga
+  }
+  return null;
+}
 // Tienda de La Serena: una dirección puntual que viene tipificada como tienda. La detectamos por su dirección (Ruta 5 Norte / Regimiento Arica).
 function esTiendaSerena(dir){const t=keyComuna(dir);return t.includes('REGTO ARIC')||t.includes('REGIMIENTO ARIC')||(t.includes('RUTA 5 NORTE')&&t.includes('ARIC'));}
+// #25a · tipo de reprogramación desde la columna Chofer
+function reprogTipo(chofer){const t=normC(chofer);if(/REFACTURAC/.test(t))return 'refact';if(/REPROGRAMAC/.test(t))return 'reprog';return '';}
+// #25b · banda horaria desde la columna Hora
+function bandaDe(h){const s=String(h||'').replace(/\s/g,'');const m=/(\d{1,2}):?\d{0,2}-(\d{1,2}):?\d{0,2}/.exec(s);
+  if(!m)return {code:'SB',lbl:'Sin banda'};const a=+m[1],b=+m[2];
+  if(a===9&&b===20)return {code:'SB',lbl:'Sin banda (09-20)'};
+  if(a===9&&b===14)return {code:'AM',lbl:'AM (09-14)'};
+  if(a===14&&b===20)return {code:'PM',lbl:'PM (14-20)'};
+  if(a===18&&b===21)return {code:'NOC',lbl:'Nocturna (18-21)'};
+  return {code:'OTRA',lbl:a+'-'+b};}
 function brandOf(op){return (op||'').indexOf('canon')===0?'canon':'rosen';}
 function opNombre(op){return {'rosen-vina':'Rosen Viña','canon-vina':'Canon Viña','canon-rm':'Canon RM','rosen-serena':'Rosen Serena','canon-serena':'Canon Serena'}[op]||op;}
 // Comunas por zona (para la nomenclatura/leyenda #8)
-const ZONACOM={VN:['Viña del Mar'],QV:['Quilpué','Villa Alemana','El Belloto'],VL:['Valparaíso','Curauma'],CR:['Concón','Reñaca'],LO:['Limache','Olmué'],IN:['Quillota','La Cruz','La Calera','Nogales','Hijuelas'],CNR:['La Ligua','Cabildo','Papudo','Zapallar','Petorca'],CNU:['Quintero','Puchuncaví','Horcón'],US:['La Serena'],UC:['Coquimbo'],VS:['Paiguano','Vicuña'],OV:['Ovalle'],INC:['Combarbalá','Monte Patria','Punitaqui','Río Hurtado','Sotaquí','Illapel'],AN:['Andacollo'],CC:['Guanaqueros','Las Tacas','Puerto Velero','Tongoy','Totoralillo'],CEN:['Santiago','Providencia','Estación Central','Quinta Normal','San Miguel','San Joaquín'],OTE:['Las Condes','Vitacura','Lo Barnechea','La Reina','Ñuñoa'],SOR:['Puente Alto','La Florida','Peñalolén','Macul'],SUR:['San Bernardo','La Pintana','El Bosque','La Cisterna','La Granja','San Ramón','Lo Espejo','P.A. Cerda','Buin','Paine'],NTE:['Recoleta','Independencia','Conchalí','Huechuraba'],NP:['Quilicura','Renca','Pudahuel','Cerro Navia','Lo Prado'],PON:['Maipú','Cerrillos','Padre Hurtado','Peñaflor'],RUR:['Melipilla','Talagante','Isla de Maipo','El Monte','Curacaví','Calera de Tango','Pirque','San José de Maipo','Tiltil','Alhué','María Pinto','San Pedro'],FR:['Colina','Lampa'],STS:['Servicio técnico']};
+const ZONACOM={VN:['Viña del Mar'],QV:['Quilpué','Villa Alemana','El Belloto'],VL:['Valparaíso','Curauma'],CR:['Concón','Reñaca'],LO:['Limache','Olmué'],IN:['Quillota','La Cruz','La Calera','Nogales','Hijuelas'],CNR:['La Ligua','Cabildo','Papudo','Zapallar','Cachagua','Petorca','Los Molles','Pichidangui'],CNU:['Quintero','Puchuncaví','Horcón','Maitencillo','Ventanas','Loncura'],LI:['Algarrobo','El Quisco','El Tabo','Las Cruces','Isla Negra','Cartagena','San Antonio','Santo Domingo','Casablanca','Quintay','Tunquén'],US:['La Serena'],UC:['Coquimbo'],VS:['Paiguano','Vicuña'],OV:['Ovalle'],INC:['Combarbalá','Monte Patria','Punitaqui','Río Hurtado','Sotaquí','Illapel'],AN:['Andacollo'],CC:['Guanaqueros','Las Tacas','Puerto Velero','Tongoy','Totoralillo'],CEN:['Santiago','Providencia','Estación Central','Quinta Normal','San Miguel','San Joaquín'],OTE:['Las Condes','Vitacura','Lo Barnechea','La Reina','Ñuñoa'],SOR:['Puente Alto','La Florida','Peñalolén','Macul'],SUR:['San Bernardo','La Pintana','El Bosque','La Cisterna','La Granja','San Ramón','Lo Espejo','P.A. Cerda','Buin','Paine'],NTE:['Recoleta','Independencia','Conchalí','Huechuraba'],NP:['Quilicura','Renca','Pudahuel','Cerro Navia','Lo Prado'],PON:['Maipú','Cerrillos','Padre Hurtado','Peñaflor'],RUR:['Melipilla','Talagante','Isla de Maipo','El Monte','Curacaví','Calera de Tango','Pirque','San José de Maipo','Tiltil','Alhué','María Pinto','San Pedro'],FR:['Colina','Lampa'],STS:['Servicio técnico']};
 // Frecuencia: días en que sale cada zona (#10). Default = todos. Config por operación.
 let FREQ={},volView='vol';
 async function loadFreq(){const r=await sbGet(`jornada=eq.${encodeURIComponent('freq:'+MALLA.op)}&chofer=eq.__FREQ__&select=data`);FREQ=(r&&r.length&&r[0].data)?r[0].data:{};}
@@ -515,9 +667,9 @@ function subirMaestro(e){
       const d=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
       const head=d[0].map(x=>normC(x));
       const f2=(...n)=>{for(const x of n){const nx=normC(x);const i=head.findIndex(h=>h===nx||h.includes(nx));if(i>=0)return i;}return -1;};
-      const iP=f2('patente'),iT=f2('tipo'),iOp=f2('operacion'),iU=f2('uso');
+      const iP=f2('patente'),iT=f2('tipo'),iOp=f2('operacion'),iU=f2('uso'),iMT=f2('mt3','m3','mt 3','capacidad','volumen'); // #17 · capacidad MT3
       const pat=[];
-      d.slice(1).forEach(r=>{if(!r||!String(r[iP]||'').trim())return;const code=normC(r[iOp]).replace(/\s/g,'');const node=OPMAP[code]||'';const uso=/BACK/.test(normC(r[iU]))?'backup':'planta';pat.push({pat:String(r[iP]).trim().toUpperCase(),tipo:String(iT>=0?r[iT]:'').trim(),op:node,uso});});
+      d.slice(1).forEach(r=>{if(!r||!String(r[iP]||'').trim())return;const code=normC(r[iOp]).replace(/\s/g,'');const node=OPMAP[code]||'';const uso=/BACK/.test(normC(r[iU]))?'backup':'planta';const cap=iMT>=0?(parseFloat(String(r[iMT]).replace(',','.'))||0):0;pat.push({pat:String(r[iP]).trim().toUpperCase(),tipo:String(iT>=0?r[iT]:'').trim(),op:node,uso,cap});});
       MAESTRO={pat};
       await sbUpsert([{jornada:'maestro',chofer:'__BASE__',data:MAESTRO,cerrada:false}]);
       toast('Maestro cargado: '+pat.length+' patentes');renderGrid();
@@ -528,11 +680,13 @@ function subirMaestro(e){
 }
 function patentesDeNodo(op){
   const seen={};
-  MAESTRO.pat.filter(p=>p.op===op).forEach(p=>{if(seen[p.pat]){if(p.uso==='planta')seen[p.pat].uso='planta';}else seen[p.pat]={pat:p.pat,tipo:p.tipo,uso:p.uso};});
+  MAESTRO.pat.filter(p=>p.op===op).forEach(p=>{if(seen[p.pat]){if(p.uso==='planta')seen[p.pat].uso='planta';if(p.cap&&!seen[p.pat].cap)seen[p.pat].cap=p.cap;}else seen[p.pat]={pat:p.pat,tipo:p.tipo,uso:p.uso,cap:p.cap||0};});
   const planta=[],backup=[];
   Object.keys(seen).sort().forEach(k=>{(seen[k].uso==='planta'?planta:backup).push(seen[k]);});
   return {planta,backup};
 }
+// #17 · capacidad MT3 por patente (desde el Maestro)
+function capDe(pat){const m=MAESTRO.pat.find(p=>p.pat===pat&&p.cap);return m?m.cap:0;}
 
 // ---- Semana (#7) ----
 function isoWeekKey(d){const dt=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));const day=dt.getUTCDay()||7;dt.setUTCDate(dt.getUTCDate()+4-day);const ys=new Date(Date.UTC(dt.getUTCFullYear(),0,1));const wk=Math.ceil((((dt-ys)/86400000)+1)/7);return dt.getUTCFullYear()+'-W'+String(wk).padStart(2,'0');}
@@ -541,7 +695,13 @@ function weekDates(wk){const mon=weekMonday(wk);if(!mon)return null;const a=[];f
 function renderWeekLbl(){const ds=weekDates(MALLA.week);if(!ds){$('malla-weeklbl').textContent='';return;}const a=ds[0],b=ds[5];$('malla-weeklbl').textContent='📅 Semana '+a.getUTCDate()+'–'+b.getUTCDate()+' '+MESC[b.getUTCMonth()]+' '+b.getUTCFullYear();}
 
 // ---- Estado + persistencia (por operación + semana) ----
-let MALLA={op:'',week:'',asign:{},orig:{},lock:{},vol:{},volg:{},comdet:{},sinzona:{},fcarga:'',patManual:[],totOrd:0};
+// vol/volg/comdet/sinzona/fcarga/totOrd = VISTA del día seleccionado (derivada de *Dia). La pre-plani se ancla POR DÍA (#req2).
+let MALLA={op:'',week:'',asign:{},orig:{},lock:{},vol:{},volg:{},comdet:{},sinzona:{},fcarga:'',patManual:[],totOrd:0,ocup:null,
+  volDia:{},volgDia:{},comdetDia:{},sinzDia:{},fcargaDia:{},totOrdDia:{},reprogDia:{},bandaDia:{},reprog:[],banda:{}};
+// fecha (clave tipo JORNADA) del día k de la semana actual — para anclar/leer la pre-plani por día
+function dayDateKey(k){const ds=weekDates(MALLA.week);const i=DIAS.findIndex(d=>d[0]===k);if(!ds||i<0)return JORNADA;const x=ds[i];return 'd'+x.getUTCFullYear()+'-'+String(x.getUTCMonth()+1).padStart(2,'0')+'-'+String(x.getUTCDate()).padStart(2,'0');}
+// refresca la VISTA (MALLA.vol…) al día seleccionado
+function applyDay(){const k=pickOcupDia();MALLA.vol=MALLA.volDia[k]||{};MALLA.volg=MALLA.volgDia[k]||{};MALLA.comdet=MALLA.comdetDia[k]||{};MALLA.sinzona=MALLA.sinzDia[k]||{};MALLA.fcarga=MALLA.fcargaDia[k]||'';MALLA.totOrd=MALLA.totOrdDia[k]||0;MALLA.reprog=(MALLA.reprogDia||{})[k]||[];MALLA.banda=(MALLA.bandaDia||{})[k]||{};}
 let zonaExp=null;
 function mallaKey(){return 'malla:'+MALLA.op+':'+MALLA.week;}
 async function loadMalla(){
@@ -554,12 +714,25 @@ async function loadMalla(){
   volView='vol';await loadFreq();
   const rows=await sbGet(`jornada=eq.${encodeURIComponent(mallaKey())}&chofer=eq.__MALLA__&select=data`);
   const d=(rows&&rows.length&&rows[0].data)?rows[0].data:{};
-  MALLA.asign=d.asign||{};MALLA.orig=d.orig||{};MALLA.lock=d.lock||{};MALLA.vol=d.vol||{};MALLA.volg=d.volg||{};MALLA.comdet=d.comdet||{};MALLA.sinzona=d.sinzona||{};MALLA.fcarga=d.fcarga||'';MALLA.patManual=d.patManual||[];MALLA.totOrd=d.totOrd||0;
-  zonaExp=null;renderWeekLbl();renderVol();renderGrid();
+  MALLA.asign=d.asign||{};MALLA.orig=d.orig||{};MALLA.lock=d.lock||{};MALLA.patManual=d.patManual||[];MALLA.ocup=d.ocup||null;
+  MALLA.volDia=d.volDia||{};MALLA.volgDia=d.volgDia||{};MALLA.comdetDia=d.comdetDia||{};MALLA.sinzDia=d.sinzDia||{};MALLA.fcargaDia=d.fcargaDia||{};MALLA.totOrdDia=d.totOrdDia||{};
+  MALLA.reprogDia=d.reprogDia||{};MALLA.bandaDia=d.bandaDia||{};
+  zonaExp=null;ocupDia='';
+  // migración: registros viejos con vol plano (por semana) → lo pasamos al día por defecto
+  if(!Object.keys(MALLA.volDia).length && d.vol && Object.keys(d.vol).length){const mk=pickOcupDia();MALLA.volDia[mk]=d.vol;MALLA.volgDia[mk]=d.volg||{};MALLA.comdetDia[mk]=d.comdet||{};MALLA.sinzDia[mk]=d.sinzona||{};MALLA.fcargaDia[mk]=d.fcarga||'';MALLA.totOrdDia[mk]=d.totOrd||0;}
+  applyDay();renderWeekLbl();renderVol();renderGrid();renderHist();
+}
+// #17/#19b/#22 · snapshot de ocupación POR DÍA (contenedores llenos + ociosa) que queda histórico junto a la malla de la semana
+function buildOcupSnap(){
+  const dias={};
+  DIAS.forEach(([k])=>{const o=computeOcupDay(k);const zonas={};Object.keys(o.demand).forEach(z=>{zonas[z]={dem:+o.demand[z].toFixed(2),fill:+o.filled[z].toFixed(2)};});dias[k]={veh:o.veh,totCap:+o.totCap.toFixed(2),idle:+o.totIdle.toFixed(2),zonas};});
+  return {ts:new Date().toISOString(),vol:MALLA.vol,volg:MALLA.volg,totOrd:MALLA.totOrd,fcarga:MALLA.fcarga,dias};
 }
 async function saveMalla(notify){
   if(!MALLA.op)return false;
-  const ok=await sbUpsert([{jornada:mallaKey(),chofer:'__MALLA__',data:{asign:MALLA.asign,orig:MALLA.orig,lock:MALLA.lock,vol:MALLA.vol,volg:MALLA.volg,comdet:MALLA.comdet,sinzona:MALLA.sinzona,fcarga:MALLA.fcarga,patManual:MALLA.patManual},cerrada:false}]);
+  const ocup=buildOcupSnap();MALLA.ocup=ocup;renderHist();
+  const ok=await sbUpsert([{jornada:mallaKey(),chofer:'__MALLA__',data:{asign:MALLA.asign,orig:MALLA.orig,lock:MALLA.lock,patManual:MALLA.patManual,ocup,
+    volDia:MALLA.volDia,volgDia:MALLA.volgDia,comdetDia:MALLA.comdetDia,sinzDia:MALLA.sinzDia,fcargaDia:MALLA.fcargaDia,totOrdDia:MALLA.totOrdDia,reprogDia:MALLA.reprogDia,bandaDia:MALLA.bandaDia},cerrada:false}]);
   if(ok&&notify)toast('Malla guardada ✓');
   return ok;
 }
@@ -576,9 +749,11 @@ function subirPreplany(e){
       const iCom=find('comuna'),iVol=find('volumen','volúmen','m3'),iDir=find('direccion','dirección'),iGeo=find('geocerca'),iO=find('nro.f12','numero guia','guia','orden');
       const iTipo=find('tipo de ruta','tipo'),iDesc=find('descripción','descripcion'),iTienda=find('tienda'),iSrv=find('servicio'),iCant=find('cantidad ruta','cantidad'),iCentro=find('centro');
       const iDescMat=find('descripcion mat','descripción mat','descripcion material','descripción material','material'); // nombre del producto (acá viene "SOFA ...")
+      const iChofer=find('chofer','conductor'),iHora=find('hora');   // #25 · reprogramaciones (Chofer) y bandas (Hora)
       // Un archivo Rosen puede traer Viña Y Serena juntas (+ SSTT). Separamos por región.
-      const reg={vina:{vol:{},volg:{},comdet:{},sinz:{},ord:new Set()},serena:{vol:{},volg:{},comdet:{},sinz:{},ord:new Set()},rm:{vol:{},volg:{},comdet:{},sinz:{},ord:new Set()}};
-      const seen={},seenC={};let nv=0,ns=0,nr=0;
+      const mkReg=()=>({vol:{},volg:{},comdet:{},sinz:{},ord:new Set(),reprog:[],banda:{}});
+      const reg={vina:mkReg(),serena:mkReg(),rm:mkReg()};
+      const seen={},seenC={},seenRB={};let nv=0,ns=0,nr=0;
       const parsed=[];
       d.slice(1).forEach(r=>{
         if(!r||(iO>=0&&!String(r[iO]||'').trim()))return;
@@ -599,11 +774,18 @@ function subirPreplany(e){
         const descMat=[iDescMat,iDesc].filter(x=>x>=0).map(x=>normC(r[x])).join(' ');   // busca "SOFA" en Descripción Mat. (y Descripción por si acaso)
         const sofa=descMat.includes('SOFA')?cantL:0;                                    // sofá: +1 m³ por cada unidad
         const v=retiro?0:(volBase+sofa);                                                // ajustado con sofá, SIN dividir (= volumen real del camión, igual al Excel maestro)
-        parsed.push({comuna,zbase,region,isSTS,isTienda,v,o});
+        const dir=iDir>=0?String(r[iDir]||'').trim():'';
+        parsed.push({comuna,zbase,region,isSTS,isTienda,v,o,dir,
+          rtipo:iChofer>=0?reprogTipo(r[iChofer]):'',banda:iHora>=0?bandaDe(r[iHora]):{code:'SB',lbl:'Sin banda'},hora:iHora>=0?String(r[iHora]||'').trim():''});
       });
       const majority=(nr>=nv&&nr>=ns&&nr>0)?'rm':(ns>nv?'serena':'vina');
       parsed.forEach(p=>{
         const R=p.region||majority;const B=reg[R];B.ord.add(p.o);
+        // #25 · reprogramaciones + bandas (una vez por orden)
+        const rbk=R+'|'+p.o;if(!seenRB[rbk]){seenRB[rbk]=1;
+          if(p.rtipo)B.reprog.push({o:p.o,tipo:p.rtipo,comuna:p.comuna,dir:p.dir});
+          const bc=p.banda.code;if(!B.banda[bc])B.banda[bc]={n:0,lbl:p.banda.lbl,ords:[]};B.banda[bc].n++;if(B.banda[bc].ords.length<120)B.banda[bc].ords.push({o:p.o,comuna:p.comuna,hora:p.hora});
+        }
         // Tienda Serena (solo en Serena) tiene prioridad; STS se separa solo fuera de Serena (en Viña es importante, en Serena va al despacho normal).
         let z = (R==='serena'&&p.isTienda) ? 'TDA'
               : (p.isSTS&&R!=='serena') ? 'STS'
@@ -614,6 +796,7 @@ function subirPreplany(e){
         } else if(p.comuna){const cn=keyComuna(p.comuna);B.sinz[cn]=B.sinz[cn]||{vol:0,g:0};B.sinz[cn].vol+=p.v;const ck=R+'|S|'+cn+'|'+p.o;if(!seenC[ck]){seenC[ck]=1;B.sinz[cn].g++;}}
       });
       const fcarga=new Date().toLocaleString('es-CL',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+      const day=pickOcupDia();const dayLbl=((DIAS.find(x=>x[0]===day)||[])[1])||day;   // #req2 · se ancla al DÍA seleccionado abajo
       const brand='rosen';const resumen=[];   // solo Rosen sube pre-planilla; Canon no
       for(const region of ['vina','serena','rm']){
         const B=reg[region];if(!Object.keys(B.vol).length&&!Object.keys(B.sinz).length)continue;
@@ -621,30 +804,49 @@ function subirPreplany(e){
         const key='malla:'+op+':'+MALLA.week;
         const rr=await sbGet(`jornada=eq.${encodeURIComponent(key)}&chofer=eq.__MALLA__&select=data`);
         const dd=(rr&&rr.length&&rr[0].data)?rr[0].data:{};
-        dd.vol=B.vol;dd.volg=B.volg;dd.comdet=B.comdet;dd.sinzona=B.sinz;dd.fcarga=fcarga;dd.totOrd=B.ord.size;
+        dd.volDia=dd.volDia||{};dd.volgDia=dd.volgDia||{};dd.comdetDia=dd.comdetDia||{};dd.sinzDia=dd.sinzDia||{};dd.fcargaDia=dd.fcargaDia||{};dd.totOrdDia=dd.totOrdDia||{};
+        dd.reprogDia=dd.reprogDia||{};dd.bandaDia=dd.bandaDia||{};
+        dd.volDia[day]=B.vol;dd.volgDia[day]=B.volg;dd.comdetDia[day]=B.comdet;dd.sinzDia[day]=B.sinz;dd.fcargaDia[day]=fcarga;dd.totOrdDia[day]=B.ord.size;
+        dd.reprogDia[day]=B.reprog;dd.bandaDia[day]=B.banda;
         dd.asign=dd.asign||{};dd.orig=dd.orig||{};dd.lock=dd.lock||{};dd.patManual=dd.patManual||[];
         await sbUpsert([{jornada:key,chofer:'__MALLA__',data:dd,cerrada:false}]);
         resumen.push(opNombre(op)+' ('+Object.keys(B.vol).length+' zonas)');
       }
+      // #18/#21 · guardar el DETALLE crudo de la pre-plani anclado al DÍA (para descargas Planificación/Bajadas y cruce con Ruta)
+      const origHead=d[0].map(x=>x==null?'':x);
+      const origRows=d.slice(1).filter(r=>iO<0||String(r[iO]||'').trim());
+      await sbUpsert([{jornada:'preplani:'+dayDateKey(day),chofer:'__DET__',data:{head:origHead,rows:origRows},cerrada:false}]);
       const curReg=MALLA.op.indexOf('serena')>=0?'serena':(MALLA.op.indexOf('rm')>=0?'rm':'vina');
       const showReg=Object.keys(reg[curReg].vol).length?curReg:majority;
       $('malla-op').value=brand+'-'+showReg;
       await loadMalla();
+      ocupDia=day;applyDay();renderVol();renderCap();renderGrid();   // mostrar el día recién cargado
       const totAll=new Set(parsed.map(p=>p.o)).size;
-      toast(resumen.length?('✓ Cargado: '+resumen.join(' · ')+' · '+totAll+' órdenes'):'No reconocí comunas en el archivo',resumen.length?0:1);
+      toast(resumen.length?('✓ '+dayLbl+' · '+resumen.join(' · ')+' · '+totAll+' órdenes'):'No reconocí comunas en el archivo',resumen.length?0:1);
     }catch(err){toast('Error: '+err.message,1);}
     e.target.value='';
   };
   rd.readAsBinaryString(f);
 }
+function renderDaySel(){
+  const box=$('malla-daysel');if(!box)return;
+  if(!MALLA.op||!isRosenOp()){box.innerHTML='';return;}   // #26 · selector de día solo Rosen
+  const ds=weekDates(MALLA.week);const k=pickOcupDia();
+  const btns=DIAS.map(([kk,lbl],i)=>{const has=MALLA.volDia&&MALLA.volDia[kk]&&Object.keys(MALLA.volDia[kk]).length;const dn=ds?ds[i].getUTCDate():'';
+    return `<button onclick="setOcupDia('${kk}')" style="flex:1;padding:5px 0;font-size:10.5px;font-weight:700;border:1px solid ${kk===k?'#002E5D':'#dde'};background:${kk===k?'#002E5D':'#fff'};color:${kk===k?'#fff':'#002E5D'};border-radius:6px;cursor:pointer" title="${has?'con pre-planilla':'sin pre-planilla'}">${lbl}${dn?(' '+dn):''}${has?' ●':''}</button>`;}).join('');
+  box.innerHTML='<div style="font-size:11px;font-weight:700;color:#002E5D;margin-bottom:4px">📆 Día (la pre-planilla que subís se ancla a este día · ● = ya cargado)</div><div style="display:flex;gap:4px">'+btns+'</div>';
+}
 function renderVol(){
+  applyDay();   // #req2 · la vista de volumen es del DÍA seleccionado
+  renderDaySel();
   const isCanon=(MALLA.op||'').indexOf('canon')===0;   // Canon: nunca pre-planilla, solo frecuencia de zonas
-  $('malla-fcarga').textContent=(!isCanon&&MALLA.fcarga)?('Pre-planilla: '+MALLA.fcarga+(MALLA.totOrd?(' · '+MALLA.totOrd+' órdenes'):'')):'';
+  const kSel=pickOcupDia(),lblSel=((DIAS.find(d=>d[0]===kSel)||[])[1])||kSel;
+  $('malla-fcarga').textContent=(!isCanon&&MALLA.fcarga)?('Pre-plani '+lblSel+': '+MALLA.fcarga+(MALLA.totOrd?(' · '+MALLA.totOrd+' órdenes'):'')):((!isCanon)?('Pre-plani '+lblSel+': sin cargar'):'');
   const hasVol=!isCanon&&Object.keys(MALLA.vol).length;
   const view=hasVol?volView:'zonas';
   const box=$('malla-vol'),sb=$('malla-sin');
   const toggle=hasVol?`<div style="display:flex;gap:4px;margin-bottom:7px"><button class="btn ${view==='vol'?'b1':'bg'}" style="flex:1;padding:4px;font-size:10.5px" onclick="setVolView('vol')">Volumen</button><button class="btn ${view==='zonas'?'b1':'bg'}" style="flex:1;padding:4px;font-size:10.5px" onclick="setVolView('zonas')">Zonas</button></div>`:'';
-  if(view==='zonas'){box.innerHTML=toggle+renderLegend();sb.innerHTML='';return;}
+  if(view==='zonas'){box.innerHTML=toggle+renderLegend();sb.innerHTML='';renderExtra();return;}
   const ks=Object.keys(MALLA.vol);ks.sort((a,b)=>MALLA.vol[b]-MALLA.vol[a]);
   const totM3=ks.reduce((s,z)=>s+(MALLA.vol[z]||0),0),totG=ks.reduce((s,z)=>s+(MALLA.volg[z]||0),0);
   const totRow=`<div class="volrow" style="background:#EEF2F6;border-color:#cdd6df;cursor:default;font-weight:700"><span><b>TOTAL</b></span><span><b>${totM3.toFixed(1)} m³</b> · ${totG} g</span></div>`;
@@ -656,7 +858,37 @@ function renderVol(){
     return h;
   }).join('');
   const sz=MALLA.sinzona||{};const sk=Object.keys(sz);
-  sb.innerHTML=sk.length?('<div style="font-size:11px;color:#c0392b;font-weight:700;margin-bottom:4px">⚠ Sin identificar ('+sk.length+')</div>'+sk.sort((a,b)=>sz[b].vol-sz[a].vol).map(c=>`<span class="comrow" style="border-color:#f1c9c4"><span>${c}</span><b>${sz[c].vol.toFixed(1)}·${sz[c].g}</b></span>`).join('')):'';
+  const zopts='<option value="">→ asignar zona…</option>'+(ZONAS[MALLA.op]||[]).filter(([z])=>z!=='N/D'&&z!=='N/C').map(([z,nm])=>`<option value="${z}">${z} · ${nm}</option>`).join('');
+  let sinHtml='';
+  if(sk.length){sinHtml='<div style="font-size:11px;color:#c0392b;font-weight:700;margin:6px 0 4px">⚠ Sin identificar ('+sk.length+')</div>'+
+    sk.sort((a,b)=>sz[b].vol-sz[a].vol).map(c=>{const cc=c.replace(/'/g,'');return `<div class="comrow" style="border-color:#f1c9c4;flex-direction:column;align-items:stretch;gap:3px"><div style="display:flex;justify-content:space-between"><span>${c}</span><b>${sz[c].vol.toFixed(1)}·${sz[c].g}</b></div><select onchange="asignarSin('${cc}',this.value)" style="font-size:10px;padding:2px;border:1px solid #f1c9c4;border-radius:5px">${zopts}</select></div>`;}).join('');}
+  sb.innerHTML=sinHtml;
+  renderExtra();
+}
+// #25 · Reprogramaciones + Bandas horarias (solo Rosen), clickables por campo, del día seleccionado
+let extraOpen={};
+function toggleExtra(k){extraOpen[k]=!extraOpen[k];renderExtra();}
+function renderExtra(){
+  const box=$('malla-extra');if(!box)return;
+  if(!isRosenOp()){box.innerHTML='';return;}
+  const rep=MALLA.reprog||[],ban=MALLA.banda||{};let html='';
+  if(rep.length){
+    const nRef=rep.filter(r=>r.tipo==='refact').length,nRep=rep.filter(r=>r.tipo==='reprog').length;
+    html+=`<div class="volrow" style="cursor:pointer;background:#fdecea;border-color:#f1c9c4" onclick="toggleExtra('rep')"><span>🔁 <b>Reprogramaciones: ${rep.length}</b></span><span>${extraOpen.rep?'▴':'▾'}</span></div>`;
+    if(extraOpen.rep)html+='<div class="comdet"><div style="font-size:9.5px;color:#8A8780;margin-bottom:2px">Refacturación '+nRef+' · Reprogramación '+nRep+'</div>'+rep.map(r=>`<span class="comrow"><span>${r.o}${r.comuna?(' · '+r.comuna):''}</span><b>${r.tipo==='refact'?'REF':'REP'}</b></span>`).join('')+'</div>';
+  }
+  // #25b · SOLO AM/PM/NOC (la "Sin banda" 09-20 es lo normal → no se muestra). Cada banda es un campo desplegable independiente.
+  const bcodes=['AM','PM','NOC'].filter(c=>ban[c]&&ban[c].n);
+  if(bcodes.length){
+    html+='<div style="font-size:10px;color:#8A8780;margin:6px 0 3px">🕒 Bandas horarias (tocá para ver las órdenes)</div>';
+    html+=bcodes.map(c=>{
+      const open=extraOpen[c];
+      let h=`<div class="volrow" style="cursor:pointer" onclick="toggleExtra('${c}')"><span><b>${c}</b> · ${ban[c].lbl}</span><span>${ban[c].n} ${open?'▴':'▾'}</span></div>`;
+      if(open)h+='<div class="comdet">'+(ban[c].ords||[]).map(x=>`<span class="comrow"><span>${x.o}${x.comuna?(' · '+x.comuna):''}</span><b>${(x.hora||'').replace(/\s/g,'')}</b></span>`).join('')+'</div>';
+      return h;
+    }).join('');
+  }
+  box.innerHTML=html;
 }
 function renderLegend(){
   const zs=(ZONAS[MALLA.op]||[]).filter(([z])=>ZONACOM[z]&&z!=='STS');
@@ -668,27 +900,144 @@ function renderLegend(){
   }).join('');
 }
 function toggleZona(z){zonaExp=(zonaExp===z?null:z);renderVol();}
+// #17/#23 · Celda con hasta 2 zonas [principal, secundaria]. Tolera formato viejo (string simple).
+function cellArr(c){if(Array.isArray(c))return [c[0]||'',c[1]||''];return [c||'',''];}
+function cellZonas(c){return cellArr(c).filter(z=>z&&z!=='N/D'&&z!=='N/C');}
+// #17/#23 · Ocupación POR DÍA con cascada: el MT3 del camión llena su zona principal hasta la demanda; el excedente cae en la secundaria; lo que sobra = capacidad ociosa.
+let ocupDia='';
+function diasConAsign(){const s={};DIAS.forEach(([k])=>s[k]=0);Object.keys(MALLA.asign||{}).forEach(p=>{const row=MALLA.asign[p]||{};DIAS.forEach(([k])=>{if(cellZonas(row[k]).length)s[k]++;});});return s;}
+function pickOcupDia(){
+  if(ocupDia)return ocupDia;
+  const cnt=diasConAsign();const ds=weekDates(MALLA.week);
+  if(ds){const t=new Date();const ymd=x=>x.getUTCFullYear()+'-'+x.getUTCMonth()+'-'+x.getUTCDate();const ti=ds.findIndex(x=>ymd(x)===ymd(new Date(Date.UTC(t.getFullYear(),t.getMonth(),t.getDate()))));if(ti>=0){ocupDia=DIAS[ti][0];return ocupDia;}}
+  const conAsign=DIAS.find(([k])=>cnt[k]>0);ocupDia=conAsign?conAsign[0]:'L';return ocupDia;
+}
+// #24c · zonas especiales que NO son contenedores de cobertura
+const SPECIALZ=new Set(['STS','ES','N/D','N/C','TDA']);
+// #24a · cascada por PRIORIDAD (independiente del orden): 1) solos, 2) 2-zonas en su principal, 3) 2-zonas en su secundaria.
+function computeOcupDay(k){
+  const vd=(MALLA.volDia&&MALLA.volDia[k])||{};
+  const demand={};Object.keys(vd).forEach(z=>{if(!SPECIALZ.has(z))demand[z]=vd[z]||0;});
+  const remaining=Object.assign({},demand);
+  const trucks=[];let anyCap=false;const noMT=[];
+  Object.keys(MALLA.asign||{}).sort().forEach(pat=>{
+    const zz=cellZonas((MALLA.asign[pat]||{})[k]).filter(z=>!SPECIALZ.has(z));if(!zz.length)return;
+    const cap=capDe(pat);if(cap)anyCap=true;else noMT.push(pat);
+    trucks.push({pat,cap,z1:zz[0]||'',z2:zz[1]||'',left:cap,f1:0,f2:0,idle:0,solo:zz.length===1});
+  });
+  // reparte 'need' de la zona entre 'list' (proporcional a su capacidad restante 'left'); acumula en fkey; devuelve lo cubierto
+  function repartir(need,list,fkey){
+    if(need<=0||!list.length)return 0;const totLeft=list.reduce((s,t)=>s+t.left,0);if(totLeft<=0)return 0;
+    const take=Math.min(need,totLeft);list.forEach(t=>{const part=take*(t.left/totLeft);t[fkey]+=part;t.left-=part;});return take;
+  }
+  Object.keys(demand).forEach(z=>{remaining[z]-=repartir(remaining[z],trucks.filter(t=>t.solo&&t.z1===z),'f1');});        // 1) SOLOS (prioridad)
+  Object.keys(demand).forEach(z=>{remaining[z]-=repartir(remaining[z],trucks.filter(t=>!t.solo&&t.z1===z),'f1');});      // 2) 2-zonas · principal (remanente)
+  Object.keys(demand).forEach(z=>{remaining[z]-=repartir(remaining[z],trucks.filter(t=>!t.solo&&t.z2===z),'f2');});      // 3) 2-zonas · secundaria (excedente)
+  trucks.forEach(t=>t.idle=t.left);
+  const filled={};Object.keys(demand).forEach(z=>filled[z]=demand[z]-(remaining[z]||0));
+  const totIdle=trucks.reduce((s,t)=>s+t.idle,0),totCap=trucks.reduce((s,t)=>s+t.cap,0);
+  return {demand,filled,remaining,trucks,totIdle,totCap,veh:trucks.length,anyCap,noMT};
+}
+function setOcupDia(k){ocupDia=k;applyDay();renderVol();renderCap();renderGrid();}
+// #27a · tolerancia de cobertura: una zona se da por cubierta si le falta menos que max(1% demanda, 0.3 m³)
+function covTol(dem){return Math.max(dem*0.01,0.3);}
+// #27c · asignar una patente a una zona con remanente (a su primera caja libre del día)
+function asignarRemanente(pat,zona){
+  if(!pat)return;const k=pickOcupDia();const cc=cellArr((MALLA.asign[pat]||{})[k]);
+  const slot=cc[0]?(cc[1]?-1:1):0;
+  if(slot<0){toast(pat+' ya tiene 2 zonas ese día',1);return;}
+  setCell(pat,k,slot,zona);toast(pat+' → '+zona+(slot?' (secundaria)':' (principal)'));
+}
+function renderCap(){
+  const box=$('malla-cap');if(!box)return;
+  if(!MALLA.op||!isRosenOp()){box.innerHTML='';return;}   // #26 · contenedores solo Rosen
+  const k=pickOcupDia();const oc=computeOcupDay(k);
+  if(!oc.veh && !Object.keys(oc.demand).length){box.innerHTML='';return;}
+  const demTot=Object.values(oc.demand).reduce((a,b)=>a+b,0),fillTot=Object.values(oc.filled).reduce((a,b)=>a+b,0);
+  const g=`<div class="volrow" style="background:#002E5D;color:#fff;border-color:#002E5D;cursor:default;flex-direction:column;align-items:stretch;gap:2px"><div style="display:flex;justify-content:space-between"><span><b>📦 Demanda ${demTot.toFixed(1)} m³</b></span><span>${oc.veh} veh · ${k}</span></div><div style="display:flex;justify-content:space-between;font-size:10px;opacity:.92"><span>Capacidad camiones ${oc.totCap.toFixed(1)} m³</span><span>Cubierto ${fillTot.toFixed(1)} m³</span></div></div>`;
+  const idle=oc.totIdle>0.05?`<div style="font-size:10px;color:#8A8780;background:#f4f3f0;border:1px solid #e6e4dd;border-radius:6px;padding:3px 7px;margin-bottom:5px">Capacidad libre: <b>${oc.totIdle.toFixed(1)} m³</b> <span style="font-size:9px">(media carga = normal en baja demanda)</span></div>`:'';
+  const zk=Object.keys(oc.demand).sort((a,b)=>oc.demand[b]-oc.demand[a]);
+  const rows=zk.map(z=>{
+    const c=ZCOLOR[z]||'#B4B2A9';const dem=oc.demand[z]||0;const fill=oc.filled[z]||0;
+    const pctFill=dem>0?Math.min(100,fill/dem*100):0;const full=dem>0&&(dem-fill)<=covTol(dem);const short=Math.max(0,dem-fill);   // #27a tolerancia
+    const barc=full?'#1a7a3c':(pctFill>=70?'#D9B65C':'#FF6600');
+    const bar=`<div style="height:9px;border-radius:5px;background:#edeae2;margin-top:3px;overflow:hidden;position:relative"><div style="height:100%;width:${pctFill}%;background:${barc};transition:width .2s"></div></div>`;
+    const badge=full?'<span style="color:#1a7a3c;font-weight:800">✓</span>':`<span style="color:#FF6600;font-weight:700">faltan ${short.toFixed(1)}</span>`;
+    return `<div style="border:0.5px solid #eee;border-radius:8px;padding:5px 7px;margin-bottom:4px;font-size:10.5px"><div style="display:flex;justify-content:space-between;align-items:center"><span class="zleg" style="background:${c};color:${zfg(z)}">${z}</span><span><b style="color:${barc}">${fill.toFixed(1)}</b>/${dem.toFixed(1)} m³ · ${badge}</span></div>${bar}</div>`;
+  }).join('');
+  // #27b/#27c · Remanentes (falta por asignar) + selector de patente con caja libre
+  const pn=patentesDeNodo(MALLA.op);const allP=[...new Set(pn.planta.concat(pn.backup).map(p=>p.pat).concat(MALLA.patManual||[]))];
+  const freeSlotOf=p=>{const cc=cellArr((MALLA.asign[p]||{})[k]);return cc[0]?(cc[1]?-1:1):0;};
+  const libreOf=p=>{const a=oc.trucks.find(t=>t.pat===p);return a?a.idle:capDe(p);};
+  const avail=allP.filter(p=>freeSlotOf(p)>=0).sort((a,b)=>libreOf(b)-libreOf(a));
+  const rem=zk.filter(z=>(oc.demand[z]-oc.filled[z])>covTol(oc.demand[z]));
+  let remHtml='';
+  if(rem.length){
+    const opts='<option value="">+ patente…</option>'+avail.map(p=>`<option value="${p}">${p} · ${libreOf(p).toFixed(1)} m³ libre</option>`).join('');
+    remHtml='<div style="margin-top:6px;border:1px solid #f1c9c4;background:#fdecea;border-radius:8px;padding:6px 7px"><div style="font-size:10.5px;font-weight:800;color:#c0392b;margin-bottom:4px">🔴 Falta por asignar</div>'
+      +rem.map(z=>{const short=oc.demand[z]-oc.filled[z];return `<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:4px"><span><span class="zleg" style="background:${ZCOLOR[z]||'#888'};color:${zfg(z)}">${z}</span> falta <b>${short.toFixed(1)}</b> m³</span><select style="font-size:10px;padding:2px;max-width:140px" onchange="asignarRemanente(this.value,'${z}')">${opts}</select></div>`;}).join('')
+      +(avail.length?'':'<div style="font-size:9px;color:#8A8780">No hay camiones con caja libre este día — agregá patente o liberá una.</div>')
+      +'</div>';
+  } else if(zk.length){
+    remHtml='<div style="margin-top:6px;font-size:10.5px;color:#1a7a3c;font-weight:700;text-align:center">✓ Todo cubierto</div>';
+  }
+  let note='';
+  if(oc.noMT.length)note+=`<div style="font-size:9.5px;color:#c0392b;margin-top:4px">⚠ Cobertura incompleta: ${oc.noMT.length} patente(s) sin MT3 (${oc.noMT.slice(0,4).join(', ')}${oc.noMT.length>4?'…':''}). Cargá el Maestro con la columna MT3.</div>`;
+  else if(!oc.anyCap&&oc.veh)note+='<div style="font-size:9.5px;color:#c0392b;margin-top:4px">Sin MT3 en el Maestro → cargalo con la columna MT3 para llenar los contenedores.</div>';
+  box.innerHTML='<div style="font-size:10px;color:#8A8780;margin:2px 0 4px">Contenedores por zona · '+k+'</div>'+g+idle+rows+remHtml+note;
+}
+// #19b · histórico de ocupación por día (del snapshot guardado), debajo de la malla
+function renderHist(){
+  const box=$('malla-hist');if(!box)return;const oc=MALLA.ocup;
+  if(!isRosenOp()||!oc||!oc.dias){box.innerHTML='';return;}   // #26 · histórico solo Rosen
+  const ds=weekDates(MALLA.week);
+  const rows=DIAS.map(([k,lbl],i)=>{const dd=oc.dias[k];if(!dd||!dd.veh)return '';const dn=ds?(' '+ds[i].getUTCDate()):'';
+    const zk=Object.keys(dd.zonas||{}).filter(z=>dd.zonas[z].dem>0);const full=zk.filter(z=>dd.zonas[z].fill>=dd.zonas[z].dem-0.05).length;
+    return `<div style="display:flex;justify-content:space-between;gap:8px;border:1px solid #eee;border-radius:7px;padding:4px 8px;margin-bottom:3px;font-size:10.5px"><span><b>${lbl}${dn}</b> · ${dd.veh} veh</span><span>${dd.totCap.toFixed(1)} m³${dd.idle>0.05?(' · ociosa '+dd.idle.toFixed(1)):''} · ${full}/${zk.length} zonas llenas</span></div>`;}).join('');
+  box.innerHTML=rows?('<div style="font-size:10px;color:#8A8780;margin-bottom:4px">Histórico de ocupación por día (se guarda al presionar 💾; pasá el mouse por el día en la malla para el detalle)</div>'+rows):'';
+}
+// #22 · pop-over con el resumen guardado del día al posicionarse en el encabezado
+function dayPop(k,ev){
+  const pop=$('day-pop');const oc=MALLA.ocup;const lbl=((DIAS.find(d=>d[0]===k)||[])[1])||k;
+  let html='<div style="font-weight:800;color:#002E5D;margin-bottom:4px">'+lbl+' · resumen guardado</div>';
+  if(!oc||!oc.dias||!oc.dias[k]||!oc.dias[k].veh){html+='<div style="color:#8A8780">Sin datos guardados para este día. Asigná camiones y guardá la malla (💾) para capturarlo.</div>';}
+  else{const dd=oc.dias[k];
+    html+='<div style="margin-bottom:4px">🚚 <b>'+dd.veh+'</b> veh · <b>'+dd.totCap.toFixed(1)+'</b> m³'+(dd.idle>0.05?(' · ociosa '+dd.idle.toFixed(1)):'')+'</div>';
+    const zk=Object.keys(dd.zonas).filter(z=>dd.zonas[z].dem>0).sort((a,b)=>dd.zonas[b].dem-dd.zonas[a].dem);
+    html+=zk.map(z=>{const zz=dd.zonas[z];const full=zz.fill>=zz.dem-0.05;const c=ZCOLOR[z]||'#888';return '<div style="display:flex;justify-content:space-between;gap:8px;margin-bottom:1px"><span class="zleg" style="background:'+c+';color:'+zfg(z)+'">'+z+'</span><span>'+zz.fill.toFixed(1)+'/'+zz.dem.toFixed(1)+' m³'+(full?' ✓':'')+'</span></div>';}).join('');
+    if(oc.fcarga)html+='<div style="color:#8A8780;margin-top:5px;font-size:10px">Pre-plani: '+oc.fcarga+(oc.totOrd?(' · '+oc.totOrd+' órdenes'):'')+'</div>';
+  }
+  pop.innerHTML=html;pop.style.display='block';
+  const x=Math.min((ev.clientX||100)+12,window.innerWidth-290),y=Math.min((ev.clientY||100)+12,window.innerHeight-220);
+  pop.style.left=x+'px';pop.style.top=y+'px';
+}
+function hideDayPop(){const p=$('day-pop');if(p)p.style.display='none';}
 function renderGrid(){
   const op=MALLA.op,zonas=ZONAS[op]||[];
+  const twoZ=isRosenOp();   // #26 · 2 zonas por celda solo en Rosen; Canon queda con 1 (como estaba)
   const pn=patentesDeNodo(op);
   const manual=(MALLA.patManual||[]).filter(p=>!pn.planta.some(x=>x.pat===p)&&!pn.backup.some(x=>x.pat===p)).map(p=>({pat:p,tipo:'',uso:'manual'}));
   const ds=weekDates(MALLA.week);
-  if(!pn.planta.length&&!pn.backup.length&&!manual.length){$('malla-grid').innerHTML='<div class="empty">Sin patentes. Sube el Maestro (⚙) o agrega con “+ patente”.</div>'+addBtn();return;}
+  if(!pn.planta.length&&!pn.backup.length&&!manual.length){$('malla-grid').innerHTML='<div class="empty">Sin patentes. Sube el Maestro (⚙) o agrega con “+ patente”.</div>'+addBtn();renderCap();return;}
   let head='<tr><th class="pat">Patente</th>';
-  DIAS.forEach(([k,lbl],i)=>{const lk=MALLA.lock[k];const dn=ds?(' '+ds[i].getUTCDate()):'';head+=`<th>${lbl}${dn}<br><button class="lockbtn${lk?' on':''}" onclick="toggleLock('${k}')">${lk?'🔒':'🔓'}</button></th>`;});
+  DIAS.forEach(([k,lbl],i)=>{const lk=MALLA.lock[k];const dn=ds?(' '+ds[i].getUTCDate()):'';head+=`<th style="cursor:help" onmouseenter="dayPop('${k}',event)" onmousemove="dayPop('${k}',event)" onmouseleave="hideDayPop()">${lbl}${dn}<br><button class="lockbtn${lk?' on':''}" onclick="toggleLock('${k}')">${lk?'🔒':'🔓'}</button></th>`;});
   head+='<th>Días</th><th></th></tr>';
+  function selHtml(pat,k,slot,z,lk,sec){
+    const opts='<option value="">·</option>'+zonas.map(([zc])=>`<option value="${zc}"${zc===z?' selected':''}>${zc}</option>`).join('');
+    const c=z?(ZCOLOR[z]||'#888'):'#fff',fg=z?zfg(z):(sec?'#adb5bd':'#1a1d2e');
+    return `<select title="${sec?'Zona secundaria (excedente)':'Zona principal'}" onchange="setCell('${pat}','${k}',${slot},this.value)" ${lk?'disabled':''} style="background:${c};color:${fg}${sec?';margin-top:2px;font-size:10px;opacity:.92':''}">${opts}</select>`;
+  }
   function rowsHtml(list,cls){
     return list.map(p=>{
       const pat=p.pat,row=MALLA.asign[pat]||{},orow=MALLA.orig[pat]||{};
-      let dias=0;const zs=[];DIAS.forEach(([k])=>{const z=row[k]||'';if(z&&z!=='N/D'&&z!=='N/C'){dias++;zs.push(z);}});
+      let dias=0;const zs=[];DIAS.forEach(([k])=>{const zz=cellZonas(row[k]);if(zz.length){dias++;zs.push(zz[0]);}});
       const low=dias>=5&&new Set(zs).size===1;
       let tds=`<td class="pat ${cls}">${pat}${low?'<span class="rot" title="Baja rotación"></span>':''}${p.tipo?`<div class="ptipo">${p.tipo}</div>`:''}</td>`;
       DIAS.forEach(([k])=>{
-        const z=row[k]||'',o=orow[k]||'',lk=MALLA.lock[k];
-        const opts='<option value="">·</option>'+zonas.map(([zc])=>`<option value="${zc}"${zc===z?' selected':''}>${zc}</option>`).join('');
-        const c=z?(ZCOLOR[z]||'#888'):'#fff',fg=z?zfg(z):'#1a1d2e';
-        const diff=(o&&o!==z)?`<div class="omod" title="Original: ${o}">orig ${o}</div>`:'';
-        tds+=`<td><select onchange="setCell('${pat}','${k}',this.value)" ${lk?'disabled':''} style="background:${c};color:${fg}">${opts}</select>${diff}</td>`;
+        const cel=cellArr(row[k]),z1=cel[0],z2=cel[1],oc=cellArr(orow[k]),lk=MALLA.lock[k];
+        const diff=[];if(oc[0]&&oc[0]!==z1)diff.push('orig '+oc[0]);if(twoZ&&oc[1]&&oc[1]!==z2)diff.push('2ª '+oc[1]);
+        const d=diff.length?`<div class="omod" title="Modificado sobre lo del supervisor">${diff.join(' · ')}</div>`:'';
+        tds+=`<td>${selHtml(pat,k,0,z1,lk,false)}${twoZ?selHtml(pat,k,1,z2,lk,true):''}${d}</td>`;
       });
       const dc=dias===6?'#1a7a3c':dias===0?'#adb5bd':'#002E5D';
       tds+=`<td class="dias" style="color:${dc}">${dias}</td><td><button class="lockbtn" onclick="delPatente('${pat}')" title="Quitar">✕</button></td>`;
@@ -701,20 +1050,20 @@ function renderGrid(){
   if(manual.length)html+='<tr class="secrow"><td colspan="9">+ Agregadas manual</td></tr>'+rowsHtml(manual,'');
   html+='</tbody></table>'+addBtn();
   $('malla-grid').innerHTML=html;
+  renderCap();
 }
 function addBtn(){return '<div style="margin-top:8px"><button class="btn bg" style="padding:4px 9px;font-size:11px" onclick="addPatente()">+ patente</button></div>';}
-function setCell(p,k,v){
+function setCell(p,k,slot,v){
   if(!MALLA.asign[p])MALLA.asign[p]={};
-  const prev=MALLA.asign[p][k]||'';
+  const cell=cellArr(MALLA.asign[p][k]);const prev=cell[slot]||'';
   if(esAdmin()){
-    // El ADMIN modifica sobre lo que dejó el supervisor → recién acá se registra el "orig" y se ve la diferencia.
-    if(prev&&prev!==v){if(!MALLA.orig[p])MALLA.orig[p]={};if(!MALLA.orig[p][k])MALLA.orig[p][k]=prev;}
-    if(MALLA.orig[p]&&MALLA.orig[p][k]===v){delete MALLA.orig[p][k];} // si vuelve al valor del supervisor, limpia el diff
-  }else{
-    // El SUPERVISOR arma la malla: su valor es la base, sin dejar registro de cambio.
-    if(MALLA.orig[p])delete MALLA.orig[p][k];
-  }
-  MALLA.asign[p][k]=v;
+    // El ADMIN modifica sobre lo del supervisor → registra "orig" por recuadrito.
+    if(!MALLA.orig[p])MALLA.orig[p]={};const oc=cellArr(MALLA.orig[p][k]);
+    if(prev&&prev!==v&&!oc[slot])oc[slot]=prev;
+    if(oc[slot]===v)oc[slot]='';
+    MALLA.orig[p][k]=oc;
+  }else if(MALLA.orig[p]&&MALLA.orig[p][k]){const oc=cellArr(MALLA.orig[p][k]);oc[slot]='';MALLA.orig[p][k]=oc;}
+  cell[slot]=v;MALLA.asign[p][k]=cell;
   renderGrid();saveMalla();
 }
 function toggleLock(k){MALLA.lock[k]=!MALLA.lock[k];renderGrid();saveMalla();}
@@ -725,9 +1074,11 @@ function delPatente(pat){
   delete MALLA.asign[pat];delete MALLA.orig[pat];renderGrid();saveMalla();
 }
 function eliminarCarga(){
-  if(!Object.keys(MALLA.vol).length){toast('No hay carga para eliminar',1);return;}
-  if(!confirm('¿Eliminar la pre-planilla cargada (volumen)? La malla de asignación NO se toca.'))return;
-  MALLA.vol={};MALLA.volg={};MALLA.comdet={};MALLA.sinzona={};MALLA.fcarga='';zonaExp=null;renderVol();saveMalla();toast('Carga eliminada');
+  const k=pickOcupDia();const lbl=((DIAS.find(d=>d[0]===k)||[])[1])||k;
+  if(!MALLA.volDia[k]||!Object.keys(MALLA.volDia[k]).length){toast('No hay carga en '+lbl,1);return;}
+  if(!confirm('¿Eliminar la pre-planilla del día '+lbl+'? La malla de asignación NO se toca.'))return;
+  delete MALLA.volDia[k];delete MALLA.volgDia[k];delete MALLA.comdetDia[k];delete MALLA.sinzDia[k];delete MALLA.fcargaDia[k];delete MALLA.totOrdDia[k];
+  zonaExp=null;applyDay();renderVol();renderCap();saveMalla();toast('Carga eliminada ('+lbl+')');
 }
 function vaciarMalla(){
   if(!confirm('¿Vaciar TODA la malla (asignaciones)? Las patentes quedan.'))return;
