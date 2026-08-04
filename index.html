@@ -230,7 +230,18 @@
   #app-real table.malla tfoot td{position:sticky;bottom:0;background:#EAF0F6;border-top:2px solid var(--bt-line);z-index:3;font-weight:800;color:var(--bt-navy);padding:8px 5px;text-align:center;font-size:11px}
   #app-real table.malla tfoot td.pat{text-align:left;z-index:4}
   #app-real table.malla tfoot .mc-vol{font-size:9.5px;color:var(--bt-muted);font-weight:700}
-  #app-real #malla-extra:not(:empty){background:#fff;border:1px solid var(--bt-line);border-radius:var(--bt-r-lg);box-shadow:var(--bt-sh-soft);padding:12px}
+  #app-real .mbottom{margin-top:16px}
+  #app-real #malla-extra{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;align-items:start}
+  #app-real .mcard{background:#fff;border:1px solid var(--bt-line);border-radius:var(--bt-r-lg);box-shadow:var(--bt-sh-soft);overflow:hidden;align-self:start}
+  #app-real .mcard-h{width:100%;display:flex;align-items:center;gap:10px;background:#fff;border:0;padding:13px 14px;cursor:pointer;text-align:left}
+  #app-real .mcard-t{flex:1;font-size:13px;font-weight:700;color:var(--bt-charcoal)}
+  #app-real .mcard-c{font-size:10.5px;font-weight:800;color:var(--bt-muted);background:var(--bt-surface);border:1px solid var(--bt-line);border-radius:var(--bt-r-pill);padding:2px 9px}
+  #app-real .mcard-x{font-size:11px;color:var(--bt-muted)}
+  #app-real .mcard-b{padding:2px 14px 14px;display:flex;flex-direction:column;gap:6px;max-height:280px;overflow:auto}
+  #app-real .mcard-row{display:flex;justify-content:space-between;gap:8px;font-size:11px;background:var(--bt-surface);border:1px solid var(--bt-line);border-radius:6px;padding:6px 9px}
+  #app-real .mcard.empty{opacity:.72}
+  #app-real .mcard-h:disabled{cursor:default}
+  #app-real .mcard-c.on{color:#fff;background:var(--bt-coral);border-color:var(--bt-coral)}
   @media(max-width:640px){.bt-shell{gap:26px;padding:34px 16px 22px;justify-content:flex-start}.bt-logo{padding:22px 30px 18px}.bt-logo__word{font-size:46px}.bt-logo__sub{font-size:10px;letter-spacing:.26em}.bt-roles{gap:16px;max-width:460px}.bt-medal{width:74px;height:74px}.bt-h2{font-size:21px}.bt-sessionbar{flex-wrap:wrap;justify-content:center}}
 </style>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
@@ -391,9 +402,7 @@
                 <div id="malla-fcarga" class="hint" style="margin-top:0;margin-bottom:8px"></div>
                 <div id="malla-vol" style="display:none"></div>
                 <div id="malla-cap"></div>
-                <div id="malla-sin" style="margin-top:8px"></div>
               </div>
-              <div id="malla-extra"></div>
             </aside>
             <main class="mmain">
               <div class="card">
@@ -403,6 +412,11 @@
                 <div id="malla-hist" style="margin-top:10px"></div>
               </div>
             </main>
+          </div>
+          <!-- ===== Detalle abajo de la malla: reprogramaciones / bandas / STS / sin identificar ===== -->
+          <div class="mbottom">
+            <div id="malla-extra"></div>
+            <div id="malla-sin" style="display:none"></div>
           </div>
         </div>
         <div id="malla-empty" class="card"><div class="empty">Elegí una operación para ver su malla.</div></div>
@@ -1195,12 +1209,7 @@ function renderVol(){
     if(hasDet&&zonaExp===z){const cks=Object.keys(cd).sort((a,b)=>cd[b].vol-cd[a].vol);h+='<div class="comdet">'+cks.map(cc=>`<span class="comrow"><span>${cc}</span><b>${cd[cc].vol.toFixed(1)}·${cd[cc].g}</b></span>`).join('')+'</div>';}
     return h;
   }).join('');
-  const sz=MALLA.sinzona||{};const sk=Object.keys(sz);
-  const zopts='<option value="">→ asignar zona…</option>'+(ZONAS[MALLA.op]||[]).filter(([z])=>z!=='N/D'&&z!=='N/C').map(([z,nm])=>`<option value="${z}">${z} · ${nm}</option>`).join('');
-  let sinHtml='';
-  if(sk.length){sinHtml='<div style="font-size:11px;color:#c0392b;font-weight:700;margin:6px 0 4px">⚠ Sin identificar ('+sk.length+')</div>'+
-    sk.sort((a,b)=>sz[b].vol-sz[a].vol).map(c=>{const cc=c.replace(/'/g,'');return `<div class="comrow" style="border-color:#f1c9c4;flex-direction:column;align-items:stretch;gap:3px"><div style="display:flex;justify-content:space-between"><span>${c}</span><b>${sz[c].vol.toFixed(1)}·${sz[c].g}</b></div><select onchange="asignarSin('${cc}',this.value)" style="font-size:10px;padding:2px;border:1px solid #f1c9c4;border-radius:5px">${zopts}</select></div>`;}).join('');}
-  sb.innerHTML=sinHtml;
+  if(sb)sb.innerHTML='';   // el "Sin identificar" ahora se muestra abajo de la malla (renderExtra)
   renderExtra();
 }
 // #25 · Reprogramaciones + Bandas horarias (solo Rosen), clickables por campo, del día seleccionado
@@ -1208,33 +1217,25 @@ let extraOpen={};
 function toggleExtra(k){extraOpen[k]=!extraOpen[k];renderExtra();}
 function renderExtra(){
   const box=$('malla-extra');if(!box)return;
-  if(!MALLA.op){box.innerHTML='';return;}   // Canon = Rosen (reprogramaciones/bandas si el archivo las trae)
-  const rep=MALLA.reprog||[],ban=MALLA.banda||{};let html='';
-  if(rep.length){
-    const nRef=rep.filter(r=>r.tipo==='refact').length,nRep=rep.filter(r=>r.tipo==='reprog').length;
-    html+=`<div class="volrow" style="cursor:pointer;background:#fdecea;border-color:#f1c9c4" onclick="toggleExtra('rep')"><span>🔁 <b>Reprogramaciones: ${rep.length}</b></span><span>${extraOpen.rep?'▴':'▾'}</span></div>`;
-    if(extraOpen.rep)html+='<div class="comdet"><div style="font-size:9.5px;color:#8A8780;margin-bottom:2px">Refacturación '+nRef+' · Reprogramación '+nRep+'</div>'+rep.map(r=>`<span class="comrow"><span>${r.o}${r.comuna?(' · '+r.comuna):''}</span><b>${r.tipo==='refact'?'REF':'REP'}</b></span>`).join('')+'</div>';
-  }
-  // #25b · SOLO AM/PM/NOC (la "Sin banda" 09-20 es lo normal → no se muestra). Cada banda es un campo desplegable independiente.
-  const bcodes=['AM','PM','NOC'].filter(c=>ban[c]&&ban[c].n);
-  if(bcodes.length){
-    html+='<div style="font-size:10px;color:#8A8780;margin:6px 0 3px">🕒 Bandas horarias (tocá para ver las órdenes)</div>';
-    html+=bcodes.map(c=>{
-      const open=extraOpen[c];
-      let h=`<div class="volrow" style="cursor:pointer" onclick="toggleExtra('${c}')"><span><b>${c}</b> · ${ban[c].lbl}</span><span>${ban[c].n} ${open?'▴':'▾'}</span></div>`;
-      if(open)h+='<div class="comdet">'+(ban[c].ords||[]).map(x=>`<span class="comrow"><span>${x.o}${x.comuna?(' · '+x.comuna):''}</span><b>${(x.hora||'').replace(/\s/g,'')}</b></span>`).join('')+'</div>';
-      return h;
-    }).join('');
-  }
-  // #31 · STS desplegable POR DÍA (usa MALLA.comdet['STS'] del día seleccionado → abre bien en cualquier día)
-  const sts=(MALLA.comdet&&MALLA.comdet['STS'])||null;const stsVol=(MALLA.vol&&MALLA.vol['STS'])||0;
-  if((sts&&Object.keys(sts).length)||stsVol>0.001){
-    const tot=sts?Object.values(sts).reduce((a,c)=>a+(c.vol||0),0):stsVol;
-    html+='<div style="font-size:10px;color:#8A8780;margin:6px 0 3px">🔧 Servicio técnico (STS)</div>'+
-      `<div class="volrow" style="cursor:pointer" onclick="toggleExtra('sts')"><span><b>STS</b> · ${tot.toFixed(1)} m³</span><span>${extraOpen.sts?'▴':'▾'}</span></div>`;
-    if(extraOpen.sts&&sts)html+='<div class="comdet">'+Object.keys(sts).sort((a,b)=>sts[b].vol-sts[a].vol).map(cc=>`<span class="comrow"><span>${cc}</span><b>${sts[cc].vol.toFixed(1)}·${sts[cc].g}</b></span>`).join('')+'</div>';
-  }
-  box.innerHTML=html;
+  if(!MALLA.op){box.innerHTML='';return;}
+  const rep=MALLA.reprog||[],ban=MALLA.banda||{};
+  // Los 4 cuadros SIEMPRE fijos; muestran el número (0 si no hay) y solo se abren si hay info.
+  const acc=(key,title,count,body)=>{const has=count>0&&!!body;const open=has&&extraOpen[key];
+    return `<div class="mcard${has?'':' empty'}"><button class="mcard-h" ${has?`onclick="toggleExtra('${key}')"`:'disabled'}><span class="mcard-t">${title}</span><span class="mcard-c${count>0?' on':''}">${count}</span><span class="mcard-x">${has?(open?'▴':'▾'):''}</span></button>${open?('<div class="mcard-b">'+body+'</div>'):''}</div>`;};
+  // Reprogramaciones
+  const nRef=rep.filter(r=>r.tipo==='refact').length,nRep=rep.filter(r=>r.tipo==='reprog').length;
+  const repBody=rep.length?('<div style="font-size:9.5px;color:var(--bt-muted);margin-bottom:2px">Refacturación '+nRef+' · Reprogramación '+nRep+'</div>'+rep.map(r=>`<div class="mcard-row"><span>${r.o}${r.comuna?(' · '+r.comuna):''}</span><b>${r.tipo==='refact'?'REF':'REP'}</b></div>`).join('')):'';
+  // Bandas horarias
+  const bcodes=['AM','PM','NOC'].filter(c=>ban[c]&&ban[c].n);const banN=bcodes.reduce((a,c)=>a+ban[c].n,0);
+  const banBody=bcodes.length?bcodes.map(c=>`<div style="font-size:9.5px;color:var(--bt-muted);font-weight:700;margin-top:2px">${ban[c].lbl} (${ban[c].n})</div>`+(ban[c].ords||[]).map(x=>`<div class="mcard-row"><span>${x.o}${x.comuna?(' · '+x.comuna):''}</span><b>${(x.hora||'').replace(/\s/g,'')}</b></div>`).join('')).join(''):'';
+  // STS (por día)
+  const sts=(MALLA.comdet&&MALLA.comdet['STS'])||null;const stsN=sts?Object.keys(sts).length:0;
+  const stsBody=stsN?Object.keys(sts).sort((a,b)=>sts[b].vol-sts[a].vol).map(cc=>`<div class="mcard-row"><span>${cc}</span><b>${sts[cc].vol.toFixed(1)} m³ · ${sts[cc].g} g</b></div>`).join(''):'';
+  // Sin identificar (con editor de zona)
+  const sz=MALLA.sinzona||{};const sk=Object.keys(sz);
+  const zopts='<option value="">→ asignar zona…</option>'+(ZONAS[MALLA.op]||[]).filter(([z])=>z!=='N/D'&&z!=='N/C').map(([z,nm])=>`<option value="${z}">${z} · ${nm}</option>`).join('');
+  const sinBody=sk.length?sk.sort((a,b)=>sz[b].vol-sz[a].vol).map(c=>{const cc=c.replace(/'/g,'');return `<div style="border:1px solid #f1c9c4;border-radius:6px;padding:5px 8px;display:flex;flex-direction:column;gap:4px"><div style="display:flex;justify-content:space-between;font-size:11px"><span>${c}</span><b>${sz[c].vol.toFixed(1)}·${sz[c].g}</b></div><select onchange="asignarSin('${cc}',this.value)" style="font-size:10px;padding:3px;border:1px solid #f1c9c4;border-radius:5px">${zopts}</select></div>`;}).join(''):'';
+  box.innerHTML=acc('rep','🔁 Reprogramaciones',rep.length,repBody)+acc('ban','🕒 Bandas horarias',banN,banBody)+acc('sts','🔧 STS',stsN,stsBody)+acc('sin','⚠ Sin identificar',sk.length,sinBody);
 }
 function renderLegend(){
   const zs=(ZONAS[MALLA.op]||[]).filter(([z])=>ZONACOM[z]&&z!=='STS');
@@ -1245,7 +1246,7 @@ function renderLegend(){
     return `<div style="border:0.5px solid #eee;border-radius:8px;padding:6px;margin-bottom:5px"><div><span class="zleg" style="background:${c};color:${zfg(z)}">${z}</span> <b style="font-size:10.5px">${nm}</b></div><div style="font-size:9px;color:#8A8780;margin:2px 0 4px">${ZONACOM[z].join(', ')}</div><div style="display:flex;gap:3px">${strip}</div></div>`;
   }).join('');
 }
-function toggleZona(z){zonaExp=(zonaExp===z?null:z);renderVol();}
+function toggleZona(z){zonaExp=(zonaExp===z?null:z);renderCap();}
 // #17/#23 · Celda con hasta 2 zonas [principal, secundaria]. Tolera formato viejo (string simple).
 function cellArr(c){if(Array.isArray(c))return [c[0]||'',c[1]||''];return [c||'',''];}
 function cellZonas(c){return cellArr(c).filter(z=>z&&z!=='N/D'&&z!=='N/C');}
@@ -1324,8 +1325,11 @@ function renderCap(){
     const fillCol=full?'rgba(31,122,84,.16)':(pctFill>=70?'rgba(201,138,22,.16)':'rgba(232,103,76,.14)');
     const bdr=full?'rgba(31,122,84,.42)':'#e6e4dd';
     const badge=full?'<span style="color:var(--bt-ok);font-weight:800">✓</span>':`<span style="color:var(--bt-coral-dark);font-weight:800">faltan ${short.toFixed(1)}</span>`;
-    const offFreq=zonaDias(z)[k]===0;const bajBtn=offFreq?`<button class="lockbtn" style="padding:0 5px;margin-left:4px" title="No corresponde a la frecuencia del día — bajar" onclick="bajarZona('${z}')">🔻</button>`:'';
-    return `<div style="position:relative;overflow:hidden;border:1px solid ${bdr};border-radius:10px;margin-bottom:5px;background:#fff"><div style="position:absolute;left:0;bottom:0;width:100%;height:${pctFill}%;background:${fillCol};transition:height .4s cubic-bezier(.4,1.4,.5,1)"></div><div style="position:relative;display:flex;justify-content:space-between;align-items:center;padding:7px 9px;font-size:10.5px"><span><span class="zleg" style="background:${c};color:${zfg(z)}">${z}</span>${bajBtn}</span><span><b style="color:${barc}">${fill.toFixed(1)}</b>/${dem.toFixed(1)} m³ · ${badge}</span></div></div>`;
+    const offFreq=zonaDias(z)[k]===0;const bajBtn=offFreq?`<button class="lockbtn" style="padding:0 5px;margin-left:4px" title="No corresponde a la frecuencia del día — bajar" onclick="event.stopPropagation();bajarZona('${z}')">🔻</button>`:'';
+    const g=(MALLA.volg&&MALLA.volg[z])||0;const cd=MALLA.comdet&&MALLA.comdet[z];const hasDet=cd&&Object.keys(cd).length;const exp=hasDet&&zonaExp===z;
+    let out=`<div style="position:relative;overflow:hidden;border:1px solid ${bdr};border-radius:10px;margin-bottom:${exp?'0':'5px'};background:#fff;${hasDet?'cursor:pointer':''}"${hasDet?` onclick="toggleZona('${z}')" title="Ver comunas de la zona"`:''}><div style="position:absolute;left:0;bottom:0;width:100%;height:${pctFill}%;background:${fillCol};transition:height .4s cubic-bezier(.4,1.4,.5,1)"></div><div style="position:relative;display:flex;justify-content:space-between;align-items:center;padding:7px 9px;font-size:10.5px"><span><span class="zleg" style="background:${c};color:${zfg(z)}">${z}</span>${bajBtn}</span><span><b style="color:${barc}">${fill.toFixed(1)}</b>/${dem.toFixed(1)} m³ · <b>${g}</b> g${hasDet?(' '+(exp?'▴':'▾')):''} · ${badge}</span></div></div>`;
+    if(exp){const cks=Object.keys(cd).sort((a,b)=>cd[b].vol-cd[a].vol);out+='<div class="comdet" style="margin-bottom:5px">'+cks.map(cc=>`<span class="comrow"><span>${cc}</span><b>${cd[cc].vol.toFixed(1)} m³ · ${cd[cc].g} g</b></span>`).join('')+'</div>';}
+    return out;
   }).join('');
   const bajadasDia=(MALLA.bajaZonaDia&&MALLA.bajaZonaDia[k])||[];
   const bajHtml=bajadasDia.length?('<div style="margin-top:6px;border:1px solid #cdd6df;background:#eef2f6;border-radius:8px;padding:6px 7px"><div style="font-size:10px;color:#8A8780;margin-bottom:3px">🔻 Bajadas del día (fuera de frecuencia)</div>'+bajadasDia.map(z=>`<div style="display:flex;justify-content:space-between;align-items:center;font-size:10px;margin-top:2px"><span><span class="zleg" style="background:${ZCOLOR[z]||'#888'};color:${zfg(z)}">${z}</span> ${(((MALLA.volDia&&MALLA.volDia[k])||{})[z]||0).toFixed(1)} m³</span><button class="lockbtn" onclick="restaurarZona('${z}')" title="Restaurar">↩</button></div>`).join('')+'</div>'):'';
