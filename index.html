@@ -400,8 +400,10 @@
               <div class="card">
                 <label>Demanda del día <button class="btn bg" style="float:right;padding:3px 8px;font-size:10.5px" onclick="eliminarCarga()" title="Eliminar carga">🗑</button><button class="btn bg" style="float:right;padding:3px 8px;font-size:10.5px;margin-right:4px" onclick="addComManual()" title="Agregar comuna a una zona (permanente)">➕ comuna</button></label>
                 <div id="malla-fcarga" class="hint" style="margin-top:0;margin-bottom:8px"></div>
+                <div id="malla-viewtoggle"></div>
                 <div id="malla-vol" style="display:none"></div>
                 <div id="malla-cap"></div>
+                <div id="malla-freq" style="display:none"></div>
               </div>
             </aside>
             <main class="mmain">
@@ -985,7 +987,7 @@ async function loadFreq(){const r=await sbGet(`jornada=eq.${encodeURIComponent('
 async function saveFreq(){await sbUpsert([{jornada:'freq:'+MALLA.op,chofer:'__FREQ__',data:FREQ,cerrada:false}]);}
 function zonaDias(z){return FREQ[z]||{L:1,M:1,X:1,J:1,V:1,S:1};}
 function toggleDia(z,k){if(!esAdmin()){toast('Solo el administrador puede cambiar la frecuencia',1);return;}const f=Object.assign({L:1,M:1,X:1,J:1,V:1,S:1},FREQ[z]||{});f[k]=f[k]?0:1;FREQ[z]=f;saveFreq();renderVol();}
-function setVolView(v){volView=v;renderVol();}
+function setVolView(v){volView=v;renderVol();if(v!=='freq')renderCap();}
 
 // ---- Maestro de patentes (#5/#6) ----
 const OPMAP={'C_RM':'canon-rm','C_VINA':'canon-vina','R_VINA':'rosen-vina','R_SERENA':'rosen-serena','C_SERENA':'canon-serena'};
@@ -1190,26 +1192,17 @@ function renderSummary(){
     '<div class="ms-item"><b>'+oc.veh+'</b><span class="ms-l">vehículos en ruta</span></div>';
 }
 function renderVol(){
-  applyDay();   // #req2 · la vista de volumen es del DÍA seleccionado
+  applyDay();   // #req2 · la vista es del DÍA seleccionado
   renderDaySel();renderSummary();
-  const kSel=pickOcupDia(),lblSel=((DIAS.find(d=>d[0]===kSel)||[])[1])||kSel;   // Canon = Rosen: también muestra volumen de su pre-plani
-  $('malla-fcarga').textContent=MALLA.fcarga?('Pre-plani '+lblSel+': '+MALLA.fcarga+(MALLA.totOrd?(' · '+MALLA.totOrd+' órdenes'):'')):('Pre-plani '+lblSel+': sin cargar');
-  const hasVol=Object.keys(MALLA.vol).length;
-  const view=hasVol?volView:'zonas';
-  const box=$('malla-vol'),sb=$('malla-sin');
-  const toggle=hasVol?`<div style="display:flex;gap:4px;margin-bottom:7px"><button class="btn ${view==='vol'?'b1':'bg'}" style="flex:1;padding:4px;font-size:10.5px" onclick="setVolView('vol')">Volumen</button><button class="btn ${view==='zonas'?'b1':'bg'}" style="flex:1;padding:4px;font-size:10.5px" onclick="setVolView('zonas')">Zonas</button></div>`:'';
-  if(view==='zonas'){box.innerHTML=toggle+renderLegend();sb.innerHTML='';renderExtra();return;}
-  const ks=Object.keys(MALLA.vol);ks.sort((a,b)=>MALLA.vol[b]-MALLA.vol[a]);
-  const totM3=ks.reduce((s,z)=>s+(MALLA.vol[z]||0),0),totG=ks.reduce((s,z)=>s+(MALLA.volg[z]||0),0);
-  const totRow=`<div class="volrow" style="background:#EEF2F6;border-color:#cdd6df;cursor:default;font-weight:700"><span><b>TOTAL</b></span><span><b>${totM3.toFixed(1)} m³</b> · ${totG} g</span></div>`;
-  box.innerHTML=toggle+totRow+ks.map(z=>{
-    const known=!!ZCOLOR[z];const c=known?ZCOLOR[z]:'#B4B2A9';
-    const cd=MALLA.comdet[z];const hasDet=cd&&Object.keys(cd).length;
-    let h=`<div class="volrow" onclick="toggleZona('${z}')"><span><span class="zleg" style="background:${c};color:${zfg(z)}">${z}</span> <b>${MALLA.vol[z].toFixed(1)} m³</b></span><span>${MALLA.volg[z]||0}${hasDet?(' '+(zonaExp===z?'▴':'▾')):''}</span></div>`;
-    if(hasDet&&zonaExp===z){const cks=Object.keys(cd).sort((a,b)=>cd[b].vol-cd[a].vol);h+='<div class="comdet">'+cks.map(cc=>`<span class="comrow"><span>${cc}</span><b>${cd[cc].vol.toFixed(1)}·${cd[cc].g}</b></span>`).join('')+'</div>';}
-    return h;
-  }).join('');
-  if(sb)sb.innerHTML='';   // el "Sin identificar" ahora se muestra abajo de la malla (renderExtra)
+  const kSel=pickOcupDia(),lblSel=((DIAS.find(d=>d[0]===kSel)||[])[1])||kSel;
+  const fc=$('malla-fcarga');if(fc)fc.textContent=MALLA.fcarga?('Pre-plani '+lblSel+': '+MALLA.fcarga+(MALLA.totOrd?(' · '+MALLA.totOrd+' órdenes'):'')):('Pre-plani '+lblSel+': sin cargar');
+  // toggle Demanda (tanques) / Frecuencia (días que sale cada zona)
+  const freq=volView==='freq';const tg=$('malla-viewtoggle');
+  if(tg)tg.innerHTML=`<div style="display:flex;gap:5px;margin-bottom:8px"><button class="btn ${freq?'bg':'b1'}" style="flex:1;padding:6px;font-size:11px" onclick="setVolView('vol')">📦 Demanda</button><button class="btn ${freq?'b1':'bg'}" style="flex:1;padding:6px;font-size:11px" onclick="setVolView('freq')">🗓 Frecuencia</button></div>`;
+  const cap=$('malla-cap'),fq=$('malla-freq');
+  if(freq){if(cap)cap.style.display='none';if(fq){fq.style.display='';fq.innerHTML=renderLegend();}}
+  else{if(cap)cap.style.display='';if(fq)fq.style.display='none';}
+  const sb=$('malla-sin');if(sb)sb.innerHTML='';
   renderExtra();
 }
 // #25 · Reprogramaciones + Bandas horarias (solo Rosen), clickables por campo, del día seleccionado
