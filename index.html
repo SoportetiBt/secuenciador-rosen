@@ -1112,7 +1112,28 @@ function tipoDe(pat){const f=(FLOTA.pat||[]).find(o=>o.pat===pat);return f?(f.ti
 // El enganche a la malla y el override semanal vienen en los sub-pasos B/C.
 let FLOTA={pat:[]};
 const OPS_FLOTA=[['rosen-vina','Rosen Viña'],['canon-rm','Canon RM'],['canon-vina','Canon Viña']];
-const TIPOS_FLOTA=[['camioneta','Camioneta'],['mediano','Mediano 10–15'],['camion','Camión >15']];
+// #39 · 5 TRAMOS de vehículo (es el `tipo` de la pool). clase = comportamiento: camioneta→Mini principal / camion→Big principal.
+// bigCupo = tope de nº de productos Big por ocio; bigMax = 'none'(0) / 'chico'(solo ≤1,5 m³) / 'any'.
+const TRAMOS={
+  cam_peq:   {lbl:'Camioneta Pequeña · 3 m³', clase:'camioneta', m3:3,  bigCupo:0, bigMax:'none'},
+  cam_med:   {lbl:'Camioneta Mediana · 6 m³', clase:'camioneta', m3:6,  bigCupo:2, bigMax:'chico'},
+  cam_gra:   {lbl:'Camioneta Grande · 10 m³', clase:'camioneta', m3:10, bigCupo:5, bigMax:'any'},
+  camion_med:{lbl:'Camión Mediano · 18 m³',   clase:'camion',    m3:18, bigCupo:99,bigMax:'any'},
+  camion_gra:{lbl:'Camión Grande · 25 m³',    clase:'camion',    m3:25, bigCupo:99,bigMax:'any'}
+};
+const TIPOS_FLOTA=Object.keys(TRAMOS).map(k=>[k,TRAMOS[k].lbl]);
+const TRAMO_SHORT={cam_peq:'Cta 3',cam_med:'Cta 6',cam_gra:'Cta 10',camion_med:'Cam 18',camion_gra:'Cam 25'};   // etiqueta corta para la grilla
+// tolera valores viejos (camioneta/mediano/camion/furgon) e infiere el tramo por m³ si hace falta
+function tramoKey(tipo,m3){
+  if(TRAMOS[tipo])return tipo;
+  const t=String(tipo||'');m3=+m3||0;
+  if(/camioneta|furg[oó]n/i.test(t))return m3<=4?'cam_peq':(m3<=8?'cam_med':'cam_gra');   // ANTES que camión (camioneta contiene "camion")
+  if(/mediano/i.test(t))return 'camion_med';
+  if(/cami[oó]n/i.test(t))return m3>=22?'camion_gra':'camion_med';
+  if(m3<=4)return 'cam_peq';if(m3<=8)return 'cam_med';if(m3<=13)return 'cam_gra';if(m3<=21)return 'camion_med';return 'camion_gra';
+}
+function tramoDe(pat){const f=(FLOTA.pat||[]).find(o=>o.pat===pat);return TRAMOS[tramoKey(f?f.tipo:'',f?f.m3:0)];}
+function claseDe(pat){const tr=tramoDe(pat);return tr?tr.clase:'camion';}   // sin dato → camión (big), compat.
 async function loadFlota(){
   const rows=await sbGet(`jornada=eq.flota&chofer=eq.__POOL__&select=data`);
   FLOTA=(rows&&rows.length&&rows[0].data&&Array.isArray(rows[0].data.pat))?rows[0].data:{pat:[]};
@@ -1124,11 +1145,11 @@ async function saveFlota(notify){
   return ok;
 }
 function flotaFind(p){return FLOTA.pat.find(x=>x.pat===p);}
-function mapTipoFlota(t){t=normC(t);if(/CAMIONETA/.test(t))return 'camioneta';if(/MEDIAN/.test(t))return 'mediano';if(/CAMION/.test(t))return 'camion';return 'camioneta';}
+function mapTipoFlota(t,m3){return tramoKey(t,m3);}   // #39 · mapea el tipo del Maestro a uno de los 5 tramos
 function addFlotaPat(){
   const p=(prompt('Patente nueva:')||'').toUpperCase().replace(/\s/g,'').trim();if(!p)return;
   if(flotaFind(p)){toast('Ya está en la flota',1);return;}
-  FLOTA.pat.push({pat:p,m3:0,peso:0,tipo:'camioneta',ops:[],rol:{},activa:true});
+  FLOTA.pat.push({pat:p,m3:6,peso:0,tipo:'cam_med',ops:[],rol:{},activa:true});
   renderFlota();saveFlota();
 }
 function delFlotaPat(p){if(!confirm('¿Eliminar la patente '+p+' de la flota?'))return;FLOTA.pat=FLOTA.pat.filter(x=>x.pat!==p);renderFlota();saveFlota(true);}
@@ -1141,7 +1162,7 @@ function importFlotaMaestro(){
   MAESTRO.pat.forEach(m=>{const k=String(m.pat||'').toUpperCase().trim();if(!k)return;byPat[k]=byPat[k]||{m3:0,tipo:'',rol:{}};if(m.cap>byPat[k].m3)byPat[k].m3=m.cap;if(m.tipo&&!byPat[k].tipo)byPat[k].tipo=m.tipo;if(m.op)byPat[k].rol[m.op]=(/plant/i.test(m.uso||'')?'planta':'backup');});
   let add=0,upd=0;
   Object.keys(byPat).forEach(k=>{const s=byPat[k];const ops=Object.keys(s.rol);let o=flotaFind(k);
-    if(!o){FLOTA.pat.push({pat:k,m3:s.m3||0,peso:0,tipo:mapTipoFlota(s.tipo),ops,rol:s.rol,activa:true});add++;}
+    if(!o){FLOTA.pat.push({pat:k,m3:s.m3||0,peso:0,tipo:mapTipoFlota(s.tipo,s.m3),ops,rol:s.rol,activa:true});add++;}
     else{if(!o.m3&&s.m3)o.m3=s.m3;o.ops=o.ops||[];o.rol=o.rol||{};ops.forEach(op=>{if(!o.ops.includes(op)){o.ops.push(op);o.rol[op]=s.rol[op];}});upd++;}
   });
   renderFlota();saveFlota();toast('Flota: '+add+' nuevas · '+upd+' ya existían');
@@ -1186,7 +1207,8 @@ function renderFlota(){
   const allSel=shown.every(o=>FLOTA_SEL.has(o.pat));
   const rows=shown.map(o=>{
     const sel=FLOTA_SEL.has(o.pat);
-    const tipoSel=`<select onchange="setFlotaField('${o.pat}','tipo',this.value)" style="font-size:11px;padding:2px">`+TIPOS_FLOTA.map(([v,l])=>`<option value="${v}"${o.tipo===v?' selected':''}>${l}</option>`).join('')+`</select>`;
+    const curTr=tramoKey(o.tipo,o.m3);   // #39 · muestra el tramo inferido para datos viejos
+    const tipoSel=`<select onchange="setFlotaField('${o.pat}','tipo',this.value)" style="font-size:11px;padding:2px">`+TIPOS_FLOTA.map(([v,l])=>`<option value="${v}"${curTr===v?' selected':''}>${l}</option>`).join('')+`</select>`;
     const opsCell=OPS_FLOTA.map(([op,nm])=>{const on=(o.ops||[]).includes(op);const rol=(o.rol||{})[op];
       const rolBtn=on?`<button onclick="event.stopPropagation();cycleRol('${o.pat}','${op}')" title="${rol==='backup'?'Backup':'Planta'} — clic para cambiar" style="border:0;cursor:pointer;border-radius:6px;font-size:9px;font-weight:800;padding:0 3px;background:${rol==='backup'?'#CF5238':'#1a7a3c'};color:#fff">${rol==='backup'?'B':'P'}</button>`:'';
       return `<span onclick="toggleFlotaOp('${o.pat}','${op}',${!on})" title="${nm}" style="cursor:pointer;display:inline-flex;align-items:center;gap:3px;padding:1px 5px;border-radius:10px;font-size:10px;font-weight:700;margin:1px;background:${on?'#0A4D8F':'#e6e4dd'};color:${on?'#fff':'#8A8780'}">${OPS_AB[op]||op}${on?rolBtn:''}</span>`;}).join(' ');
@@ -1213,11 +1235,11 @@ function renderWeekLbl(){const ds=weekDates(MALLA.week);if(!ds){$('malla-weeklbl
 // ---- Estado + persistencia (por operación + semana) ----
 // vol/volg/comdet/sinzona/fcarga/totOrd = VISTA del día seleccionado (derivada de *Dia). La pre-plani se ancla POR DÍA (#req2).
 let MALLA={op:'',week:'',asign:{},orig:{},lock:{},vol:{},volg:{},comdet:{},sinzona:{},fcarga:'',patManual:[],totOrd:0,ocup:null,
-  volDia:{},volgDia:{},comdetDia:{},sinzDia:{},fcargaDia:{},totOrdDia:{},reprogDia:{},bandaDia:{},reprog:[],banda:{},extraDia:{},bajaZonaDia:{}};
+  volDia:{},volgDia:{},entm3Dia:{},entcomDia:{},comdetDia:{},sinzDia:{},fcargaDia:{},totOrdDia:{},reprogDia:{},bandaDia:{},reprog:[],banda:{},extraDia:{},bajaZonaDia:{},prioPat:{},comunasDia:{}};
 // fecha (clave tipo JORNADA) del día k de la semana actual — para anclar/leer la pre-plani por día
 function dayDateKey(k){const ds=weekDates(MALLA.week);const i=DIAS.findIndex(d=>d[0]===k);if(!ds||i<0)return JORNADA;const x=ds[i];return 'd'+x.getUTCFullYear()+'-'+String(x.getUTCMonth()+1).padStart(2,'0')+'-'+String(x.getUTCDate()).padStart(2,'0');}
 // refresca la VISTA (MALLA.vol…) al día seleccionado
-function applyDay(){const k=pickOcupDia();MALLA.vol=MALLA.volDia[k]||{};MALLA.volg=MALLA.volgDia[k]||{};MALLA.ent=(MALLA.entDia||{})[k]||{};MALLA.comdet=MALLA.comdetDia[k]||{};MALLA.sinzona=MALLA.sinzDia[k]||{};MALLA.fcarga=MALLA.fcargaDia[k]||'';MALLA.totOrd=MALLA.totOrdDia[k]||0;MALLA.reprog=(MALLA.reprogDia||{})[k]||[];MALLA.banda=(MALLA.bandaDia||{})[k]||{};}
+function applyDay(){const k=pickOcupDia();MALLA.vol=MALLA.volDia[k]||{};MALLA.volg=MALLA.volgDia[k]||{};MALLA.ent=(MALLA.entDia||{})[k]||{};MALLA.entm3=(MALLA.entm3Dia||{})[k]||{};MALLA.entcom=(MALLA.entcomDia||{})[k]||{};MALLA.comdet=MALLA.comdetDia[k]||{};MALLA.sinzona=MALLA.sinzDia[k]||{};MALLA.fcarga=MALLA.fcargaDia[k]||'';MALLA.totOrd=MALLA.totOrdDia[k]||0;MALLA.reprog=(MALLA.reprogDia||{})[k]||[];MALLA.banda=(MALLA.bandaDia||{})[k]||{};}
 let zonaExp=null;
 function mallaKey(){return 'malla:'+MALLA.op+':'+MALLA.week;}
 async function loadMalla(){
@@ -1231,8 +1253,9 @@ async function loadMalla(){
   const rows=await sbGet(`jornada=eq.${encodeURIComponent(mallaKey())}&chofer=eq.__MALLA__&select=data`);
   const d=(rows&&rows.length&&rows[0].data)?rows[0].data:{};
   MALLA.asign=d.asign||{};MALLA.orig=d.orig||{};MALLA.lock=d.lock||{};MALLA.patManual=d.patManual||[];MALLA.ocup=d.ocup||null;
-  MALLA.volDia=d.volDia||{};MALLA.volgDia=d.volgDia||{};MALLA.entDia=d.entDia||{};MALLA.comdetDia=d.comdetDia||{};MALLA.sinzDia=d.sinzDia||{};MALLA.fcargaDia=d.fcargaDia||{};MALLA.totOrdDia=d.totOrdDia||{};
+  MALLA.volDia=d.volDia||{};MALLA.volgDia=d.volgDia||{};MALLA.entDia=d.entDia||{};MALLA.entm3Dia=d.entm3Dia||{};MALLA.entcomDia=d.entcomDia||{};MALLA.comdetDia=d.comdetDia||{};MALLA.sinzDia=d.sinzDia||{};MALLA.fcargaDia=d.fcargaDia||{};MALLA.totOrdDia=d.totOrdDia||{};
   MALLA.reprogDia=d.reprogDia||{};MALLA.bandaDia=d.bandaDia||{};MALLA.extraDia=d.extraDia||{};MALLA.extraMiniDia=d.extraMiniDia||{};MALLA.bajaZonaDia=d.bajaZonaDia||{};
+  MALLA.prioPat=d.prioPat||{};MALLA.comunasDia=d.comunasDia||{};   // #39 · prioridad de línea por patente + override de comunas por día
   MALLA.fueraSem=d.fueraServicio||[];   // #37B · patentes fuera de servicio ESTA semana (no borra la pool; no se hereda: cada semana arranca sin bajas)
   zonaExp=null;ocupDia=d.selDia||'';   // #28 · abre en el día que quedó guardado
   // migración: registros viejos con vol plano (por semana) → lo pasamos al día por defecto
@@ -1249,19 +1272,37 @@ async function saveMalla(notify){
   if(!MALLA.op)return false;
   const ocup=buildOcupSnap();MALLA.ocup=ocup;renderHist();
   const ok=await sbUpsert([{jornada:mallaKey(),chofer:'__MALLA__',data:{asign:MALLA.asign,orig:MALLA.orig,lock:MALLA.lock,patManual:MALLA.patManual,ocup,selDia:pickOcupDia(),
-    volDia:MALLA.volDia,volgDia:MALLA.volgDia,entDia:MALLA.entDia,comdetDia:MALLA.comdetDia,sinzDia:MALLA.sinzDia,fcargaDia:MALLA.fcargaDia,totOrdDia:MALLA.totOrdDia,reprogDia:MALLA.reprogDia,bandaDia:MALLA.bandaDia,extraDia:MALLA.extraDia,extraMiniDia:MALLA.extraMiniDia,bajaZonaDia:MALLA.bajaZonaDia,fueraServicio:MALLA.fueraSem||[]},cerrada:false}]);
+    volDia:MALLA.volDia,volgDia:MALLA.volgDia,entDia:MALLA.entDia,entm3Dia:MALLA.entm3Dia,entcomDia:MALLA.entcomDia,comdetDia:MALLA.comdetDia,sinzDia:MALLA.sinzDia,fcargaDia:MALLA.fcargaDia,totOrdDia:MALLA.totOrdDia,reprogDia:MALLA.reprogDia,bandaDia:MALLA.bandaDia,extraDia:MALLA.extraDia,extraMiniDia:MALLA.extraMiniDia,bajaZonaDia:MALLA.bajaZonaDia,prioPat:MALLA.prioPat,comunasDia:MALLA.comunasDia,fueraServicio:MALLA.fueraSem||[]},cerrada:false}]);
   if(ok&&notify)toast('Malla guardada ✓');
   return ok;
 }
 // === Canon Mini/Big (criterio del Simplificador de Planificación) ===
-// Big = mueble (m³ real). Mini = textil (m³ del sistema inflado ~4,33x → factor 0,231; se mide por ENTREGAS).
+// Big = mueble (m³ real). Mini = textil (m³ del sistema inflado ~4,15x → factor 0,241; se mide por ENTREGAS y ahora también lleva su m³ real para el espacio).
 const CANON_BIGKW=/COLCHON|CAMA|VELADOR|SOMMIER|BASE CAMA|BOX|RESPALDO|MUEBLE|CLOSET|COMODA|SILLON|SOFA|POLTRONA|ESCRITORIO|ESTANTE|REPISA|CATRE|CUNA|LITERA/;
 const CANON_TEXTILVETO=/CUBRE|PROTECTOR|PROT |FUNDA|SET/;   // "Cubre Colchón" etc. = textil mini, no mueble
-const CANON_FACTOR=0.231;      // corrector de volumen mini (inverso del 4,33x)
+const CANON_FACTOR=0.241;      // #39 · deflactor de m³ del mini (inverso del ~4,15x); SOLO afecta al mini
 const CANON_VOL_BIG=0.8;       // vol/unidad ≥ 0,8 m³ = big aunque el nombre no matchee
 const CANON_TOPE_ENT=45;       // entregas por camioneta (mini) con 5 comunas; sube al bajar comunas
 const CANON_TOPE_M3=23;        // capacidad de referencia del camión big (para estimar vehículos)
-const CANON_TOPE_COMUNAS={1:90,2:80,3:70,4:60,5:45};   // #38C2 · tope entregas camioneta según nº de comunas de la ruta
+const CANON_TOPE_COMUNAS={1:90,2:80,3:70,4:60,5:50};   // #39/C2 · tope entregas camioneta según nº de comunas de la ruta
+const BIG_CHICO_MAX=1.5;   // #39 · big ≤1,5 m³ = "chico / plaza y media" (entra a camioneta); >1,5 = "2 plazas" (solo vehículos ≥10 m³)
+const MINI_M3_EST=0.05;    // #39 · m³ estimado por entrega mini cuando no hay dato de la zona
+const CAM_GRANDE_MIN=10;   // #39 · desde 10 m³ un vehículo puede llevar big grande (2 plazas)
+// #39 · prioridad de línea por patente (default por clase): camioneta→mini, camión→big. Editable con el toggle de la grilla.
+function prioDe(pat){const o=(MALLA.prioPat||{})[pat];if(o==='mini'||o==='big')return o;return claseDe(pat)==='camioneta'?'mini':'big';}
+function togglePrio(pat){MALLA.prioPat=MALLA.prioPat||{};MALLA.prioPat[pat]=(prioDe(pat)==='mini'?'big':'mini');renderGrid();renderCap();saveMalla();}
+// #39/C2 · nº de comunas que toma la camioneta ese día (override manual o auto por las zonas asignadas, tope 5)
+function nComunasDe(pat,k){const ov=((MALLA.comunasDia||{})[k]||{})[pat];if(ov)return Math.max(1,Math.min(5,+ov));const zz=cellZonas((MALLA.asign[pat]||{})[k]);let n=0;zz.forEach(z=>{n+=(ZONACOM[z]||[]).length;});return Math.max(1,Math.min(5,n||5));}
+function setComunas(pat,n){const k=pickOcupDia();MALLA.comunasDia=MALLA.comunasDia||{};MALLA.comunasDia[k]=MALLA.comunasDia[k]||{};MALLA.comunasDia[k][pat]=+n;saveMalla();renderCap();}
+// #39 · tope de entregas mini: camioneta = por comunas (menos comunas → más paquetes); camión (mini por ocio/prioridad) = por su m³ libre
+function topeMini(pat,k){const v2=((MALLA.vuelta2||[]).indexOf(pat)>=0)?2:1;const base=(claseDe(pat)==='camioneta')?(CANON_TOPE_COMUNAS[nComunasDe(pat,k)]||CANON_TOPE_ENT):Math.floor(capDe(pat)/MINI_M3_EST);return base*v2;}
+// #39 · promedios por zona del día: m³ real por guía big, y m³ real por entrega mini (×0,241)
+function avgBigM3(k,z){const g=(((MALLA.volgDia||{})[k]||{})[z])||0;const v=(((MALLA.volDia||{})[k]||{})[z])||0;return g>0?v/g:(v||1);}
+function avgMiniM3(k,z){const e=(((MALLA.entDia||{})[k]||{})[z])||0;const m=(((MALLA.entm3Dia||{})[k]||{})[z])||0;return e>0?((m/e)||MINI_M3_EST):MINI_M3_EST;}
+// #39 · pool por tamaño: ¿la camioneta pat puede llevar big de la zona z? big grande (>1,5 m³) solo si m³≥10
+function camPuedeBig(pat,z,k){const tr=tramoDe(pat);if(!tr||tr.bigCupo<=0)return false;if(avgBigM3(k,z)>BIG_CHICO_MAX&&capDe(pat)<CAM_GRANDE_MIN)return false;return true;}
+// #39 · capacidad big (m³) que aporta una camioneta por ocio a la zona z = cupo de productos × m³ prom por guía
+function camBigCap(pat,z,k){const tr=tramoDe(pat);if(!camPuedeBig(pat,z,k))return 0;return tr.bigCupo*avgBigM3(k,z);}
 function esBigTicket(nom,perU){const N=normC(nom||'');return (CANON_BIGKW.test(N)&&!CANON_TEXTILVETO.test(N))||(perU>=CANON_VOL_BIG);}
 function subirPreplany(e){
   if(!MALLA.op){toast('Primero elige una operación',1);e.target.value='';return;}
@@ -1278,7 +1319,7 @@ function subirPreplany(e){
       const iDescMat=find('descripcion mat','descripción mat','descripcion material','descripción material','material'); // nombre del producto (acá viene "SOFA ...")
       const iChofer=find('chofer','conductor'),iHora=find('hora');   // #25 · reprogramaciones (Chofer) y bandas (Hora)
       // Un archivo Rosen puede traer Viña Y Serena juntas (+ SSTT). Separamos por región.
-      const mkReg=()=>({vol:{},volg:{},ent:{},comdet:{},sinz:{},ord:new Set(),reprog:[],banda:{}});
+      const mkReg=()=>({vol:{},volg:{},ent:{},entm3:{},entcom:{},comdet:{},sinz:{},ord:new Set(),reprog:[],banda:{}});   // #39 · entm3 = m³ real del mini · entcom = desglose mini por comuna
       const reg={vina:mkReg(),serena:mkReg(),rm:mkReg()};
       const seen={},seenC={},seenRB={},seenE={};let nv=0,ns=0,nr=0;
       const parsed=[];
@@ -1309,10 +1350,11 @@ function subirPreplany(e){
         if(retiro)v=0;
         else if(esCanonOp)v=(big&&perU<=5)?volBase:0;   // línea Big = m³; línea Mini no suma m³ (se cuenta en entregas)
         else v=volBase+sofa;
-        const mini=esCanonOp&&!retiro&&!big;   // textil → cuenta como ENTREGA, no como m³
+        const mini=esCanonOp&&!retiro&&!big;   // textil → cuenta como ENTREGA (y ahora m³ real ×0,241 para el espacio)
+        const vmini=mini?volBase*CANON_FACTOR:0;   // #39 · m³ real del mini (deflactado). SOLO mini; el big no se toca.
         const esBigLine=esCanonOp?(big&&!retiro&&perU<=5):true;   // #38C · línea que cuenta como guía BIG (mueble). Fuera de Canon, todo es big.
         const dir=iDir>=0?String(r[iDir]||'').trim():'';
-        parsed.push({comuna,zbase,region,isSTS,isTienda,v,mini,esBig:esBigLine,o,dir,
+        parsed.push({comuna,zbase,region,isSTS,isTienda,v,mini,vmini,esBig:esBigLine,o,dir,
           rtipo:iChofer>=0?reprogTipo(r[iChofer]):'',banda:iHora>=0?bandaDe(r[iHora]):{code:'SB',lbl:'Sin banda'},hora:iHora>=0?String(r[iHora]||'').trim():''});
       });
       const majority=(nr>=nv&&nr>=ns&&nr>0)?'rm':(ns>nv?'serena':'vina');
@@ -1330,7 +1372,8 @@ function subirPreplany(e){
         if(z){
           B.vol[z]=(B.vol[z]||0)+p.v;
           if(p.esBig){const gk=R+'|'+z+'|'+p.o;if(!seen[gk]){seen[gk]=1;B.volg[z]=(B.volg[z]||0)+1;}}   // #38C · guías BIG (muebles), únicas por orden — NO mezclar con mini
-          if(p.mini){const ek=R+'|'+z+'|'+p.o;if(!seenE[ek]){seenE[ek]=1;B.ent[z]=(B.ent[z]||0)+1;}}   // Canon: entregas mini (textil) por zona, únicas por orden
+          if(p.mini){const ek=R+'|'+z+'|'+p.o;if(!seenE[ek]){seenE[ek]=1;B.ent[z]=(B.ent[z]||0)+1;}B.entm3[z]=(B.entm3[z]||0)+p.vmini;   // Canon: entregas mini (únicas por orden) + m³ real por línea (#39)
+            if(p.comuna){const cc=keyComuna(p.comuna);B.entcom[z]=B.entcom[z]||{};B.entcom[z][cc]=B.entcom[z][cc]||{ent:0,m3:0};B.entcom[z][cc].m3+=p.vmini;const eck=R+'|EM|'+z+'|'+cc+'|'+p.o;if(!seenC[eck]){seenC[eck]=1;B.entcom[z][cc].ent++;}}}   // #39 · desglose mini por comuna (entregas únicas + m³)
           if(p.esBig&&p.comuna){const cc=keyComuna(p.comuna);B.comdet[z]=B.comdet[z]||{};B.comdet[z][cc]=B.comdet[z][cc]||{vol:0,g:0};B.comdet[z][cc].vol+=p.v;const ck=R+'|'+z+'|'+cc+'|'+p.o;if(!seenC[ck]){seenC[ck]=1;B.comdet[z][cc].g++;}}   // #31/#38C · desglose BIG por comuna (m³ + guías big)
         } else if(p.comuna){const cn=keyComuna(p.comuna);B.sinz[cn]=B.sinz[cn]||{vol:0,g:0};B.sinz[cn].vol+=p.v;const ck=R+'|S|'+cn+'|'+p.o;if(!seenC[ck]){seenC[ck]=1;B.sinz[cn].g++;}}
       });
@@ -1343,9 +1386,9 @@ function subirPreplany(e){
         const key='malla:'+op+':'+MALLA.week;
         const rr=await sbGet(`jornada=eq.${encodeURIComponent(key)}&chofer=eq.__MALLA__&select=data`);
         const dd=(rr&&rr.length&&rr[0].data)?rr[0].data:{};
-        dd.volDia=dd.volDia||{};dd.volgDia=dd.volgDia||{};dd.entDia=dd.entDia||{};dd.comdetDia=dd.comdetDia||{};dd.sinzDia=dd.sinzDia||{};dd.fcargaDia=dd.fcargaDia||{};dd.totOrdDia=dd.totOrdDia||{};
+        dd.volDia=dd.volDia||{};dd.volgDia=dd.volgDia||{};dd.entDia=dd.entDia||{};dd.entm3Dia=dd.entm3Dia||{};dd.entcomDia=dd.entcomDia||{};dd.comdetDia=dd.comdetDia||{};dd.sinzDia=dd.sinzDia||{};dd.fcargaDia=dd.fcargaDia||{};dd.totOrdDia=dd.totOrdDia||{};
         dd.reprogDia=dd.reprogDia||{};dd.bandaDia=dd.bandaDia||{};
-        dd.volDia[day]=B.vol;dd.volgDia[day]=B.volg;dd.entDia[day]=B.ent;dd.comdetDia[day]=B.comdet;dd.sinzDia[day]=B.sinz;dd.fcargaDia[day]=fcarga;dd.totOrdDia[day]=B.ord.size;
+        dd.volDia[day]=B.vol;dd.volgDia[day]=B.volg;dd.entDia[day]=B.ent;dd.entm3Dia[day]=B.entm3;dd.entcomDia[day]=B.entcom;dd.comdetDia[day]=B.comdet;dd.sinzDia[day]=B.sinz;dd.fcargaDia[day]=fcarga;dd.totOrdDia[day]=B.ord.size;
         dd.reprogDia[day]=B.reprog;dd.bandaDia[day]=B.banda;
         dd.asign=dd.asign||{};dd.orig=dd.orig||{};dd.lock=dd.lock||{};dd.patManual=dd.patManual||[];
         await sbUpsert([{jornada:key,chofer:'__MALLA__',data:dd,cerrada:false}]);
@@ -1386,15 +1429,25 @@ function renderSummary(){
   const demTot=Object.values(oc.demand).reduce((a,b)=>a+b,0);
   const fillTot=Object.values(oc.filled).reduce((a,b)=>a+b,0);
   const pct=demTot>0?Math.round(fillTot/demTot*100):0;
-  const col=pct>=100?'#5BD6A4':(pct>=70?'#FFC46B':'var(--bt-coral-light)');
+  const colOf=p=>p>=100?'#5BD6A4':(p>=70?'#FFC46B':'var(--bt-coral-light)');
   const isCanon=(MALLA.op||'').indexOf('canon')===0;
-  const entTot=isCanon?Object.values(MALLA.ent||{}).reduce((a,b)=>a+b,0):0;
-  const entItem=isCanon?('<div class="ms-item"><span class="ms-l">Entregas mini</span><b>'+entTot+'</b></div><div class="ms-sep"></div>'):'';
-  box.innerHTML='<div class="ms-item"><span class="ms-l">Demanda'+(isCanon?' big':'')+'</span><b>'+demTot.toFixed(1)+' m³</b></div><div class="ms-sep"></div>'+
-    entItem+
+  // #39 · vehículos en ruta = TODAS las patentes asignadas ese día (big + mini), no solo la línea Big
+  const vehTot=Object.keys(MALLA.asign||{}).filter(p=>((MALLA.fueraSem||[]).indexOf(p)<0)&&cellZonas((MALLA.asign[p]||{})[k]).length).length;
+  if(isCanon){
+    const entTot=Object.values(MALLA.ent||{}).reduce((a,b)=>a+b,0);
+    const om=computeOcupMini(k);const mDem=Object.values(om.demand).reduce((a,b)=>a+b,0),mFill=Object.values(om.filled).reduce((a,b)=>a+b,0);
+    const pctM=mDem>0?Math.round(mFill/mDem*100):0;
+    box.innerHTML='<div class="ms-item"><span class="ms-l">Demanda big</span><b>'+demTot.toFixed(1)+' m³</b></div><div class="ms-sep"></div>'+
+      '<div class="ms-item"><span class="ms-l">Entregas mini</span><b>'+entTot+'</b></div><div class="ms-sep"></div>'+
+      '<div class="ms-item ms-grow"><span class="ms-l">🛋 Cubierto big</span><b style="color:'+colOf(pct)+'">'+pct+'%</b><div class="ms-bar"><i style="width:'+Math.min(pct,100)+'%;background:'+colOf(pct)+'"></i></div></div><div class="ms-sep"></div>'+
+      '<div class="ms-item ms-grow"><span class="ms-l">📮 Cubierto mini</span><b style="color:'+colOf(pctM)+'">'+pctM+'%</b><div class="ms-bar"><i style="width:'+Math.min(pctM,100)+'%;background:'+colOf(pctM)+'"></i></div></div><div class="ms-sep"></div>'+
+      '<div class="ms-item"><b>'+vehTot+'</b><span class="ms-l">vehículos en ruta</span></div>';
+    return;
+  }
+  box.innerHTML='<div class="ms-item"><span class="ms-l">Demanda</span><b>'+demTot.toFixed(1)+' m³</b></div><div class="ms-sep"></div>'+
     '<div class="ms-item"><span class="ms-l">Capacidad</span><b>'+oc.totCap.toFixed(1)+' m³</b></div><div class="ms-sep"></div>'+
-    '<div class="ms-item ms-grow"><span class="ms-l">Cubierto</span><b style="color:'+col+'">'+pct+'%</b><div class="ms-bar"><i style="width:'+Math.min(pct,100)+'%;background:'+col+'"></i></div></div><div class="ms-sep"></div>'+
-    '<div class="ms-item"><b>'+oc.veh+'</b><span class="ms-l">vehículos en ruta</span></div>';
+    '<div class="ms-item ms-grow"><span class="ms-l">Cubierto</span><b style="color:'+colOf(pct)+'">'+pct+'%</b><div class="ms-bar"><i style="width:'+Math.min(pct,100)+'%;background:'+colOf(pct)+'"></i></div></div><div class="ms-sep"></div>'+
+    '<div class="ms-item"><b>'+vehTot+'</b><span class="ms-l">vehículos en ruta</span></div>';
 }
 function renderVol(){
   applyDay();   // #req2 · la vista es del DÍA seleccionado
@@ -1443,24 +1496,36 @@ function renderExtra(){
     const k=pickOcupDia();const ocB=computeOcupDay(k),ocM=computeOcupMini(k);
     const poolP=patentesDeNodo(MALLA.op);const allP=[...new Set(poolP.planta.concat(poolP.backup).map(p=>p.pat).concat(MALLA.patManual||[]))];
     const bt={};ocB.trucks.forEach(t=>bt[t.pat]=t);const mt={};ocM.trucks.forEach(t=>mt[t.pat]=t);
-    const idleBig=p=>bt[p]?bt[p].idle:capDe(p);const leftMini=p=>mt[p]?mt[p].left:CANON_TOPE_ENT;
-    const availBig=allP.filter(p=>tipoDe(p)!=='camioneta'&&idleBig(p)>0.05).sort((a,b)=>idleBig(b)-idleBig(a));
-    const availMini=allP.filter(p=>{const tp=tipoDe(p);return (tp==='camioneta'||tp==='mediano')&&leftMini(p)>0.5;}).sort((a,b)=>leftMini(b)-leftMini(a));
-    const optBig='<option value="">+ patente…</option>'+availBig.map(p=>`<option value="${p}">${p} · ${idleBig(p).toFixed(1)} m³</option>`).join('');
-    const optMini='<option value="">+ camioneta…</option>'+availMini.map(p=>`<option value="${p}">${p} · ${Math.round(leftMini(p))} ent</option>`).join('');
+    const idleBig=p=>bt[p]?bt[p].idle:0;const leftMini=p=>mt[p]?mt[p].left:0;
+    // #39 · opciones BIG por zona: camión con m³ libre + camioneta con cupo (pool por tamaño de la zona)
+    function optBigZ(z){
+      const camiones=allP.filter(p=>claseDe(p)==='camion').map(p=>({p,cap:bt[p]?idleBig(p):capDe(p)})).filter(o=>o.cap>0.05);
+      const cams=allP.filter(p=>claseDe(p)==='camioneta'&&camPuedeBig(p,z,k)).map(p=>({p,cap:camBigCap(p,z,k),cta:true,cupo:(tramoDe(p)||{}).bigCupo}));
+      const list=camiones.concat(cams).sort((a,b)=>b.cap-a.cap);
+      return '<option value="">+ patente…</option>'+list.map(o=>`<option value="${o.p}">${o.p} · ${o.cta?('cta '+o.cupo+' prod'):(o.cap.toFixed(1)+' m³')}</option>`).join('');
+    }
+    // #39 · opciones MINI por zona: camioneta con entregas libres + camión (mini por ocio) con su m³ libre → entregas
+    function optMiniZ(z){
+      const cams=allP.filter(p=>claseDe(p)==='camioneta').map(p=>({p,cap:mt[p]?leftMini(p):topeMini(p,k)})).filter(o=>o.cap>0.5);
+      const camiones=allP.filter(p=>claseDe(p)==='camion'&&idleBig(p)>0.05).map(p=>({p,cap:Math.floor(idleBig(p)/avgMiniM3(k,z)),ocio:true})).filter(o=>o.cap>0);
+      const list=cams.concat(camiones).sort((a,b)=>b.cap-a.cap);
+      return '<option value="">+ patente…</option>'+list.map(o=>`<option value="${o.p}">${o.p} · ${Math.round(o.cap)} ent${o.ocio?' (ocio)':''}</option>`).join('');
+    }
     const fB=Object.keys(ocB.demand).filter(z=>ocB.demand[z]>0&&!cubierta(ocB.demand[z],ocB.filled[z])).sort((a,b)=>(ocB.demand[b]-ocB.filled[b])-(ocB.demand[a]-ocB.filled[a]));
     const fM=Object.keys(ocM.demand).filter(z=>ocM.demand[z]>0&&(ocM.demand[z]-(ocM.filled[z]||0))>0.5).sort((a,b)=>(ocM.demand[b]-ocM.filled[b])-(ocM.demand[a]-ocM.filled[a]));
     const exB=(MALLA.extraDia&&MALLA.extraDia[k])||[];const exM=(MALLA.extraMiniDia&&MALLA.extraMiniDia[k])||[];
     // Columna BIG
-    let bigCol='<div style="font-size:9.5px;font-weight:700;color:var(--bt-muted);margin:0 0 4px">🛋 Big (m³) — camión / mediano</div>';
-    bigCol+= fB.length ? fB.map(z=>{const s=ocB.demand[z]-(ocB.filled[z]||0);return `<div class="mcard-row" style="gap:6px"><span><span class="zleg" style="background:${ZCOLOR[z]||'#888'};color:${zfg(z)}">${z}</span> faltan <b>${s.toFixed(1)}</b> m³</span><select style="font-size:10px;padding:2px;max-width:130px" onchange="asignarRemanente(this.value,'${z}')">${optBig}</select></div>`;}).join('') : '<div style="font-size:10px;color:var(--bt-ok)">✓ todo cubierto</div>';
+    let bigCol='<div style="font-size:9.5px;font-weight:700;color:var(--bt-muted);margin:0 0 4px">🛋 Big (m³) — camión + camioneta <span style="font-weight:400">por ocio</span></div>';
+    bigCol+= fB.length ? fB.map(z=>{const s=ocB.demand[z]-(ocB.filled[z]||0);return `<div class="mcard-row" style="gap:6px"><span><span class="zleg" style="background:${ZCOLOR[z]||'#888'};color:${zfg(z)}">${z}</span> faltan <b>${s.toFixed(1)}</b> m³</span><span style="display:flex;gap:3px;align-items:center"><select style="font-size:10px;padding:2px;max-width:112px" onchange="asignarRemanente(this.value,'${z}')">${optBigZ(z)}</select><button class="lockbtn" title="Dejar en bodega — saca la zona del cálculo del día" onclick="bajarZona('${z}')">🔻</button></span></div>`;}).join('') : '<div style="font-size:10px;color:var(--bt-ok)">✓ todo cubierto</div>';
     if(exB.length)bigCol+='<div style="font-size:9px;color:var(--bt-muted);margin:5px 0 2px">➕ Adicionales</div>'+exB.map((e,i)=>`<div class="mcard-row"><span><span class="zleg" style="background:${ZCOLOR[e.zona]||'#888'};color:${zfg(e.zona)}">${e.zona}</span> ${e.pat}</span><button class="lockbtn" onclick="quitarExtra(${i})">✕</button></div>`).join('');
     // Columna MINI
-    let miniCol='<div style="font-size:9.5px;font-weight:700;color:var(--bt-muted);margin:0 0 4px">📮 Mini (entregas) — camioneta / mediano</div>';
-    miniCol+= fM.length ? fM.map(z=>{const s=Math.round(ocM.demand[z]-(ocM.filled[z]||0));return `<div class="mcard-row" style="gap:6px"><span><span class="zleg" style="background:${ZCOLOR[z]||'#888'};color:${zfg(z)}">${z}</span> faltan <b>${s}</b> ent</span><select style="font-size:10px;padding:2px;max-width:130px" onchange="asignarRemanenteMini(this.value,'${z}')">${optMini}</select></div>`;}).join('') : '<div style="font-size:10px;color:var(--bt-ok)">✓ todo cubierto</div>';
+    let miniCol='<div style="font-size:9.5px;font-weight:700;color:var(--bt-muted);margin:0 0 4px">📮 Mini (entregas) — camioneta + camión <span style="font-weight:400">por ocio</span></div>';
+    miniCol+= fM.length ? fM.map(z=>{const s=Math.round(ocM.demand[z]-(ocM.filled[z]||0));return `<div class="mcard-row" style="gap:6px"><span><span class="zleg" style="background:${ZCOLOR[z]||'#888'};color:${zfg(z)}">${z}</span> faltan <b>${s}</b> ent</span><span style="display:flex;gap:3px;align-items:center"><select style="font-size:10px;padding:2px;max-width:112px" onchange="asignarRemanenteMini(this.value,'${z}')">${optMiniZ(z)}</select><button class="lockbtn" title="Dejar en bodega — saca la zona del cálculo del día" onclick="bajarZona('${z}')">🔻</button></span></div>`;}).join('') : '<div style="font-size:10px;color:var(--bt-ok)">✓ todo cubierto</div>';
     if(exM.length)miniCol+='<div style="font-size:9px;color:var(--bt-muted);margin:5px 0 2px">➕ Adicionales</div>'+exM.map((e,i)=>`<div class="mcard-row"><span><span class="zleg" style="background:${ZCOLOR[e.zona]||'#888'};color:${zfg(e.zona)}">${e.zona}</span> ${e.pat}</span><button class="lockbtn" onclick="quitarExtraMini(${i})">✕</button></div>`).join('');
+    const bajD=(MALLA.bajaZonaDia&&MALLA.bajaZonaDia[k])||[];   // #39 · zonas dejadas en bodega (fuera del cálculo)
+    const bajStrip=bajD.length?('<div style="margin-top:6px;border:1px solid #cdd6df;background:#eef2f6;border-radius:8px;padding:6px 8px"><div style="font-size:9.5px;font-weight:700;color:var(--bt-muted);margin-bottom:4px">🏠 Dejadas en bodega (fuera del cálculo · no cuentan como falta)</div>'+bajD.map(z=>`<span style="display:inline-flex;align-items:center;gap:4px;font-size:10px;border:1px solid #cdd6df;background:#fff;border-radius:10px;padding:1px 4px 1px 7px;margin:0 5px 5px 0"><span class="zleg" style="background:${ZCOLOR[z]||'#888'};color:${zfg(z)}">${z}</span><button class="lockbtn" title="Restaurar al cálculo" onclick="restaurarZona('${z}')">↩</button></span>`).join('')+'</div>'):'';
     const body='<div style="display:flex;gap:14px;flex-wrap:wrap"><div style="flex:1;min-width:250px">'+bigCol+'</div><div style="flex:1;min-width:250px;border-left:1px solid #eee;padding-left:12px">'+miniCol+'</div></div>';
-    fb.innerHTML=acc('falta','🔴 Falta por asignar',fB.length+fM.length,body);
+    fb.innerHTML=acc('falta','🔴 Falta por asignar / dejar en bodega',fB.length+fM.length,body)+bajStrip;
     return;
   }
   // Reprogramaciones
@@ -1488,6 +1553,8 @@ function renderLegend(){
   }).join('');
 }
 function toggleZona(z){zonaExp=(zonaExp===z?null:z);renderCap();}
+let zonaExpMini=null;   // #39 · expandir zona Mini por comuna
+function toggleZonaMini(z){zonaExpMini=(zonaExpMini===z?null:z);renderCap();}
 // #17/#23 · Celda con hasta 2 zonas [principal, secundaria]. Tolera formato viejo (string simple).
 function cellArr(c){if(Array.isArray(c))return [c[0]||'',c[1]||''];return [c||'',''];}
 function cellZonas(c){return cellArr(c).filter(z=>z&&z!=='N/D'&&z!=='N/C');}
@@ -1512,7 +1579,7 @@ function computeOcupDay(k){
   const trucks=[];let anyCap=false;const noMT=[];
   Object.keys(MALLA.asign||{}).sort().forEach(pat=>{
     if((MALLA.fueraSem||[]).indexOf(pat)>=0)return;   // #37B · patente fuera de servicio esta semana no ocupa
-    if(isCanonOp&&tipoDe(pat)==='camioneta')return;   // #38C · la camioneta hace Mini (entregas), NO Big (m³)
+    if(isCanonOp&&prioDe(pat)!=='big')return;   // #39 · la línea Big (m³, primaria) la llenan los vehículos con prioridad Big (camión por default)
     const zz=cellZonas((MALLA.asign[pat]||{})[k]).filter(z=>!SPECIALZ.has(z));if(!zz.length)return;
     const cap=capDe(pat);if(cap)anyCap=true;else noMT.push(pat);
     trucks.push({pat,cap,z1:zz[0]||'',z2:zz[1]||'',left:cap,f1:0,f2:0,idle:0,solo:zz.length===1});
@@ -1531,9 +1598,10 @@ function computeOcupDay(k){
   const tByPat={};trucks.forEach(t=>tByPat[t.pat]=t);
   extras.forEach(e=>{const z=e.zona;if(!(z in remaining))return;
     if((MALLA.fueraSem||[]).indexOf(e.pat)>=0)return;   // #37B
-    if(isCanonOp&&tipoDe(e.pat)==='camioneta')return;   // #38C · la camioneta va a Mini, no a Big
+    const esCta=isCanonOp&&claseDe(e.pat)==='camioneta';   // #39 · camioneta = Big POR OCIO: cupo de productos × m³ prom, con pool por tamaño
+    if(esCta&&!camPuedeBig(e.pat,z,k))return;   // pool: big grande (>1,5) no entra a camioneta chica (<10 m³)
     let t=tByPat[e.pat];
-    if(!t){const cp=capDe(e.pat);t={pat:e.pat,cap:cp,z1:'',z2:'',f1:0,f2:0,fe:0,idle:cp,solo:false,extra:true};trucks.push(t);tByPat[e.pat]=t;if(cp)anyCap=true;else if(noMT.indexOf(e.pat)<0)noMT.push(e.pat);}
+    if(!t){const cp=esCta?camBigCap(e.pat,z,k):capDe(e.pat);t={pat:e.pat,cap:cp,z1:'',z2:'',f1:0,f2:0,fe:0,idle:cp,solo:false,extra:true,esCta};trucks.push(t);tByPat[e.pat]=t;if(cp)anyCap=true;else if(!esCta&&noMT.indexOf(e.pat)<0)noMT.push(e.pat);}
     const fill=Math.max(0,Math.min(t.idle,remaining[z]));t.fe=(t.fe||0)+fill;t.idle-=fill;remaining[z]-=fill;t.extraZona=z;});
   const filled={};Object.keys(demand).forEach(z=>filled[z]=demand[z]-(remaining[z]||0));
   const totIdle=trucks.reduce((s,t)=>s+t.idle,0),totCap=trucks.reduce((s,t)=>s+t.cap,0);
@@ -1547,18 +1615,22 @@ function computeOcupMini(k){
   const remaining=Object.assign({},demand);const trucks=[];
   Object.keys(MALLA.asign||{}).sort().forEach(pat=>{
     if((MALLA.fueraSem||[]).indexOf(pat)>=0)return;
-    const tp=tipoDe(pat);if(tp!=='camioneta'&&tp!=='mediano')return;   // solo camioneta/mediano hacen Mini
+    if(prioDe(pat)!=='mini')return;   // #39 · línea Mini (primaria) = vehículos con prioridad Mini (camioneta por default)
     const zz=cellZonas((MALLA.asign[pat]||{})[k]).filter(z=>!SPECIALZ.has(z));if(!zz.length)return;
-    const cap=CANON_TOPE_ENT*(((MALLA.vuelta2||[]).indexOf(pat)>=0)?2:1);   // 2ª vuelta duplica (UI en C.2/C.3)
+    const cap=topeMini(pat,k);   // #39/C2 · tope por nº de comunas (menos comunas → más entregas)
     trucks.push({pat,cap,z1:zz[0]||'',z2:zz[1]||'',left:cap,f1:0,f2:0,solo:zz.length===1});
   });
   function repartir(need,list,fkey){if(need<=0||!list.length)return 0;const totLeft=list.reduce((s,t)=>s+t.left,0);if(totLeft<=0)return 0;const take=Math.min(need,totLeft);list.forEach(t=>{const part=take*(t.left/totLeft);t[fkey]+=part;t.left-=part;});return take;}
   Object.keys(demand).forEach(z=>{remaining[z]-=repartir(remaining[z],trucks.filter(t=>t.solo&&t.z1===z),'f1');});
   Object.keys(demand).forEach(z=>{remaining[z]-=repartir(remaining[z],trucks.filter(t=>!t.solo&&t.z1===z),'f1');});
   Object.keys(demand).forEach(z=>{remaining[z]-=repartir(remaining[z],trucks.filter(t=>!t.solo&&t.z2===z),'f2');});
-  // adicionales mini (asignar camioneta/mediano a un remanente de entregas)
+  // #39 · adicionales mini: camioneta (tope por comunas) o CAMIÓN por ocio (entregas = su m³ libre del big ÷ m³ prom por entrega)
+  const ocB=computeOcupDay(k);const idleByPat={};ocB.trucks.forEach(t=>{idleByPat[t.pat]=t.idle;});
   const extras=(MALLA.extraMiniDia&&MALLA.extraMiniDia[k])||[];const tByPat={};trucks.forEach(t=>tByPat[t.pat]=t);
-  extras.forEach(e=>{const z=e.zona;if(!(z in remaining))return;if((MALLA.fueraSem||[]).indexOf(e.pat)>=0)return;let t=tByPat[e.pat];if(!t){const cp=CANON_TOPE_ENT*(((MALLA.vuelta2||[]).indexOf(e.pat)>=0)?2:1);t={pat:e.pat,left:cp};trucks.push(t);tByPat[e.pat]=t;}const fill=Math.max(0,Math.min(t.left,remaining[z]));t.left-=fill;remaining[z]-=fill;});
+  extras.forEach(e=>{const z=e.zona;if(!(z in remaining))return;if((MALLA.fueraSem||[]).indexOf(e.pat)>=0)return;let t=tByPat[e.pat];
+    if(!t){let cp;if(claseDe(e.pat)==='camioneta'){cp=topeMini(e.pat,k);}else{const idleM3=(idleByPat[e.pat]!=null?idleByPat[e.pat]:capDe(e.pat));cp=Math.floor(idleM3/avgMiniM3(k,z));}
+      t={pat:e.pat,left:cp};trucks.push(t);tByPat[e.pat]=t;}
+    const fill=Math.max(0,Math.min(t.left,remaining[z]));t.left-=fill;remaining[z]-=fill;});
   const filled={};Object.keys(demand).forEach(z=>filled[z]=demand[z]-(remaining[z]||0));
   return {demand,filled,remaining,trucks,veh:trucks.length};
 }
@@ -1570,9 +1642,10 @@ function cubierta(dem,fill){return fill>0.001 && (dem-fill)<=covTol(dem);}
 // #27c · asignar una patente ADICIONAL (3ª zona, extra a las 2 de la celda): usa su capacidad libre y rebaja el contenedor
 function asignarRemanente(pat,zona){
   if(!pat)return;const k=pickOcupDia();
+  if((MALLA.op||'').indexOf('canon')===0&&claseDe(pat)==='camioneta'&&!camPuedeBig(pat,zona,k)){toast('Esa zona lleva big grande (2 plazas) — no entra en camioneta chica (<10 m³)',1);return;}   // #39 · pool por tamaño
   MALLA.extraDia=MALLA.extraDia||{};MALLA.extraDia[k]=MALLA.extraDia[k]||[];
   MALLA.extraDia[k].push({pat,zona});
-  saveMalla();renderCap();renderGrid();renderExtra();toast(pat+' → '+zona+' (Big)');
+  saveMalla();renderCap();renderGrid();renderExtra();toast(pat+' → '+zona+' (Big'+(claseDe(pat)==='camioneta'?' por ocio':'')+')');
 }
 function quitarExtra(idx){const k=pickOcupDia();if(MALLA.extraDia&&MALLA.extraDia[k]){MALLA.extraDia[k].splice(idx,1);if(!MALLA.extraDia[k].length)delete MALLA.extraDia[k];saveMalla();renderCap();renderGrid();renderExtra();}}
 // #38C · asignar camioneta/mediano a un remanente de la línea MINI (entregas)
@@ -1595,7 +1668,7 @@ function renderCap(){
   const g=`<div class="volrow" style="background:#002E5D;color:#fff;border-color:#002E5D;cursor:default;flex-direction:column;align-items:stretch;gap:2px"><div style="display:flex;justify-content:space-between"><span><b>📦 Demanda ${demTot.toFixed(1)} m³</b></span><span>${oc.veh} veh · ${k}</span></div><div style="display:flex;justify-content:space-between;font-size:10px;opacity:.92"><span>Capacidad camiones ${oc.totCap.toFixed(1)} m³</span><span>Cubierto ${fillTot.toFixed(1)} m³</span></div></div>`;
   const idle=oc.totIdle>0.05?`<div style="font-size:10px;color:#8A8780;background:#f4f3f0;border:1px solid #e6e4dd;border-radius:6px;padding:3px 7px;margin-bottom:5px">Capacidad libre: <b>${oc.totIdle.toFixed(1)} m³</b> <span style="font-size:9px">(media carga = normal en baja demanda)</span></div>`:'';
   const isCanon=(MALLA.op||'').indexOf('canon')===0;
-  const zk=Object.keys(oc.demand).sort((a,b)=>oc.demand[b]-oc.demand[a]);
+  const zk=Object.keys(oc.demand).filter(z=>oc.demand[z]>0.001||(((MALLA.volg||{})[z])||0)>0).sort((a,b)=>oc.demand[b]-oc.demand[a]);   // #39 · no mostrar contenedores Big en 0 (0 m³ y 0 guías = zona solo mini)
   const rows=zk.map(z=>{
     const c=ZCOLOR[z]||'#B4B2A9';const dem=oc.demand[z]||0;const fill=oc.filled[z]||0;
     const pctFill=dem>0?Math.min(100,fill/dem*100):0;const full=dem>0&&cubierta(dem,fill);const short=Math.max(0,dem-fill);   // #27a tolerancia (requiere capacidad asignada)
@@ -1639,12 +1712,24 @@ function renderCap(){
     const om=computeOcupMini(k);
     const mz=Object.keys(om.demand).filter(z=>om.demand[z]>0).sort((a,b)=>om.demand[b]-om.demand[a]);
     const totEnt=mz.reduce((s,z)=>s+om.demand[z],0);const totNeed=mz.reduce((s,z)=>s+Math.ceil(om.demand[z]/CANON_TOPE_ENT),0);
-    miniHtml='<div style="font-size:10.5px;font-weight:800;color:#002E5D;margin:12px 0 4px">📮 Mini · por entregas <span style="font-weight:400;color:#8A8780">(tope '+CANON_TOPE_ENT+'/camioneta · '+om.veh+' asignada(s))</span></div>';
+    const totEntM3=mz.reduce((s,z)=>s+((MALLA.entm3||{})[z]||0),0);   // #39 · m³ real del mini (×0,241)
+    miniHtml='<div style="font-size:10.5px;font-weight:800;color:#002E5D;margin:12px 0 4px">📮 Mini · por entregas <span style="font-weight:400;color:#8A8780">(tope por comunas · '+om.veh+' asignada(s))</span></div>';
     if(mz.length){
-      miniHtml+=mz.map(z=>{const dem=om.demand[z];const fill=Math.round(om.filled[z]||0);const need=Math.ceil(dem/CANON_TOPE_ENT);const short=Math.max(0,dem-fill);const ok=short<=0;const cc=ZCOLOR[z]||'#B4B2A9';
-        return `<div style="display:flex;justify-content:space-between;align-items:center;border:1px solid ${ok?'rgba(31,122,84,.42)':'#e6e4dd'};background:${ok?'rgba(31,122,84,.08)':'#fff'};border-radius:8px;padding:6px 9px;margin-bottom:4px;font-size:10.5px"><span><span class="zleg" style="background:${cc};color:${zfg(z)}">${z}</span> <span style="color:#8A8780">${need} camioneta${need>1?'s':''}</span></span><span><b style="color:${ok?'var(--bt-ok)':'var(--bt-coral-dark)'}">${fill}</b>/${dem} ${ok?'✓':('· faltan '+short)}</span></div>`;}).join('')
-        +'<div style="font-size:10px;color:#8A8780;text-align:right;margin-top:2px">Total mini: <b>'+totEnt+'</b> entregas · ~<b>'+totNeed+'</b> camionetas</div>';
+      miniHtml+=mz.map(z=>{const dem=om.demand[z];const fill=Math.round(om.filled[z]||0);const need=Math.ceil(dem/CANON_TOPE_ENT);const short=Math.max(0,dem-fill);const ok=short<=0;const cc=ZCOLOR[z]||'#B4B2A9';const m3z=(MALLA.entm3||{})[z]||0;
+        const ecd=(MALLA.entcom||{})[z];const hasDet=ecd&&Object.keys(ecd).length;const exp=hasDet&&zonaExpMini===z;   // #39 · desglose mini por comuna
+        let outm=`<div style="display:flex;justify-content:space-between;align-items:center;border:1px solid ${ok?'rgba(31,122,84,.42)':'#e6e4dd'};background:${ok?'rgba(31,122,84,.08)':'#fff'};border-radius:8px;padding:6px 9px;margin-bottom:${exp?'0':'4px'};font-size:10.5px;${hasDet?'cursor:pointer':''}"${hasDet?` onclick="toggleZonaMini('${z}')" title="Ver comunas de la zona"`:''}><span><span class="zleg" style="background:${cc};color:${zfg(z)}">${z}</span> <span style="color:#8A8780">${need} camioneta${need>1?'s':''}${m3z?(' · '+m3z.toFixed(1)+' m³'):''}${hasDet?(' '+(exp?'▴':'▾')):''}</span></span><span><b style="color:${ok?'var(--bt-ok)':'var(--bt-coral-dark)'}">${fill}</b>/${dem} ${ok?'✓':('· faltan '+short)}</span></div>`;
+        if(exp){const cks=Object.keys(ecd).sort((a,b)=>ecd[b].ent-ecd[a].ent);outm+='<div class="comdet" style="margin-bottom:4px">'+cks.map(c=>`<span class="comrow"><span>${c}</span><b>${ecd[c].ent} ent · ${ecd[c].m3.toFixed(1)} m³</b></span>`).join('')+'</div>';}
+        return outm;}).join('')
+        +'<div style="font-size:10px;color:#8A8780;text-align:right;margin-top:2px">Total mini: <b>'+totEnt+'</b> entregas · ~<b>'+totNeed+'</b> camionetas'+(totEntM3?(' · <b>'+totEntM3.toFixed(1)+'</b> m³ real'):'')+'</div>';
     } else { miniHtml+='<div style="font-size:10px;color:#8A8780">Sin entregas mini este día.</div>'; }
+    // #39/C2 · control "cuántas comunas toma" por camioneta (menos comunas → más entregas)
+    const miniTrucks=om.trucks.filter(t=>(t.z1||t.z2)&&claseDe(t.pat)==='camioneta');
+    if(miniTrucks.length){
+      miniHtml+='<div style="font-size:9.5px;font-weight:700;color:#8A8780;margin:8px 0 3px">Camionetas · comunas → tope de entregas</div>';
+      miniHtml+=miniTrucks.map(t=>{const nc=nComunasDe(t.pat,k);const tope=topeMini(t.pat,k);const zlbl=[t.z1,t.z2].filter(Boolean).join('+');
+        const sel=[1,2,3,4,5].map(n=>`<option value="${n}"${n===nc?' selected':''}>${n}</option>`).join('');
+        return `<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;font-size:10px;border:1px solid #e6e4dd;border-radius:6px;padding:3px 7px;margin-bottom:3px"><span><b>${t.pat}</b> <span style="color:#8A8780">${zlbl}</span></span><span>comunas <select style="font-size:10px;padding:1px" onchange="setComunas('${t.pat}',this.value)">${sel}</select> → <b>${tope}</b> ent</span></div>`;}).join('');
+    }
   }
   // Canon: el "Falta por asignar" va ABAJO de la malla (renderExtra), no en el panel lateral → acá se omite remHtml
   box.innerHTML='<div style="font-size:10px;color:#8A8780;margin:2px 0 4px">Contenedores por zona · '+k+'</div>'+g+idle+bigHdr+rows+(isCanon?'':remHtml)+bajHtml+miniHtml+note;
@@ -1677,6 +1762,7 @@ function dayPop(k,ev){
 function hideDayPop(){const p=$('day-pop');if(p)p.style.display='none';}
 function renderGrid(){
   const op=MALLA.op,zonas=ZONAS[op]||[];
+  const isCanon=(op||'').indexOf('canon')===0;   // #39 · toggle de prioridad Mini/Big solo en Canon
   const twoZ=true;   // Canon = Rosen: 2 zonas por celda en ambos
   const pn=patentesDeNodo(op);
   const manual=(MALLA.patManual||[]).filter(p=>!pn.planta.some(x=>x.pat===p)&&!pn.backup.some(x=>x.pat===p)).map(p=>({pat:p,tipo:'',uso:'manual'}));
@@ -1694,7 +1780,10 @@ function renderGrid(){
       const pat=p.pat,row=MALLA.asign[pat]||{},orow=MALLA.orig[pat]||{};
       let dias=0;const zs=[];DIAS.forEach(([k])=>{const zz=cellZonas(row[k]);if(zz.length){dias++;zs.push(zz[0]);}});
       const low=dias>=5&&new Set(zs).size===1;
-      let tds=`<td class="pat ${cls}">${pat}${low?'<span class="rot" title="Baja rotación"></span>':''}${p.tipo?`<div class="ptipo">${p.tipo}</div>`:''}</td>`;
+      const ptl=p.tipo?(TRAMO_SHORT[tramoKey(p.tipo,capDe(pat))]||p.tipo):'';   // #39 · nombre corto del tramo
+      const pr=prioDe(pat);   // #39 · prioridad de línea (default por clase, editable)
+      const prioChip=isCanon?`<button type="button" onclick="togglePrio('${pat}')" title="Prioridad de llenado (se llena primero) — clic para cambiar" style="display:inline-block;border:0;cursor:pointer;border-radius:5px;font-size:8.5px;font-weight:800;padding:1px 5px;margin-top:2px;background:${pr==='mini'?'#0A4D8F':'#7a4d1a'};color:#fff">${pr==='mini'?'📮 Mini':'🛋 Big'}</button>`:'';
+      let tds=`<td class="pat ${cls}">${pat}${low?'<span class="rot" title="Baja rotación"></span>':''}${ptl?`<div class="ptipo">${ptl}</div>`:''}${prioChip}</td>`;
       DIAS.forEach(([k])=>{
         const cel=cellArr(row[k]),z1=cel[0],z2=cel[1],oc=cellArr(orow[k]),lk=MALLA.lock[k];
         const diff=[];if(oc[0]&&oc[0]!==z1)diff.push('orig '+oc[0]);if(twoZ&&oc[1]&&oc[1]!==z2)diff.push('2ª '+oc[1]);
