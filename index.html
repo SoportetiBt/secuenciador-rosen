@@ -292,17 +292,37 @@
         <button class="bt-btn" onclick="btGo('landing')">← Cambiar rol</button>
         <button class="bt-btn" onclick="btLogout()">Cerrar sesión</button>
       </div>
-      <div style="text-align:center"><p class="bt-eyebrow" style="margin:0;color:var(--bt-coral)">Supervisor</p><h2 class="bt-h2" style="color:#fff;margin-top:6px">Elegí la operación</h2></div>
+      <div style="text-align:center"><p class="bt-eyebrow" style="margin:0;color:var(--bt-coral)">Supervisor</p><h2 class="bt-h2" style="color:#fff;margin-top:6px">Elegí la bodega</h2></div>
       <div class="bt-roles">
-        <div class="bt-card bt-card--click bt-card--accent-navy bt-role" onclick="btEnterApp('rosen')">
+        <div class="bt-card bt-card--click bt-card--accent-navy bt-role" onclick="btGo('vm1')">
           <div class="bt-medal bt-medal--navy"><svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M12 21s7-5.6 7-11a7 7 0 1 0-14 0c0 5.4 7 11 7 11z"/><circle cx="12" cy="10" r="2.6"/></svg></div>
-          <h2 class="bt-h2">Rosen</h2><p class="bt-body">Secuencia de ruta + Malla de rotación · Viña</p>
-          <span class="bt-chip bt-chip--navy">Viña del Mar</span><span class="bt-btn bt-btn--navy" style="margin-top:6px">Entrar →</span>
+          <h2 class="bt-h2">VM1</h2><p class="bt-body">Bodega Viña · V Región (Rosen + Big Ticket 360)</p>
+          <span class="bt-chip bt-chip--navy">Viña del Mar</span><span class="bt-btn bt-btn--navy" style="margin-top:6px">Elegir →</span>
         </div>
-        <div class="bt-card bt-card--click bt-card--accent-coral bt-role" onclick="btEnterApp('canon')">
+        <div class="bt-card bt-card--click bt-card--accent-coral bt-role" onclick="btEnterApp('canon','canon-rm')">
           <div class="bt-medal bt-medal--coral"><svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M3 12h18M9 7V4h6v3"/></svg></div>
-          <h2 class="bt-h2">Canon</h2><p class="bt-body">Malla de rotación · RM y Viña</p>
-          <span class="bt-chip bt-chip--coral">RM · Viña</span><span class="bt-btn bt-btn--primary" style="margin-top:6px">Entrar →</span>
+          <h2 class="bt-h2">RM1</h2><p class="bt-body">Bodega Santiago · Big Ticket 360</p>
+          <span class="bt-chip bt-chip--coral">RM</span><span class="bt-btn bt-btn--primary" style="margin-top:6px">Entrar →</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="bt-view" id="view-vm1" hidden style="display:flex;flex-direction:column;align-items:center;gap:22px;width:100%">
+      <div class="bt-sessionbar">
+        <button class="bt-btn" onclick="btGo('operacion')">← Bodegas</button>
+        <button class="bt-btn" onclick="btLogout()">Cerrar sesión</button>
+      </div>
+      <div style="text-align:center"><p class="bt-eyebrow" style="margin:0;color:var(--bt-coral)">VM1 · Bodega Viña</p><h2 class="bt-h2" style="color:#fff;margin-top:6px">Elegí el operador</h2></div>
+      <div class="bt-roles">
+        <div class="bt-card bt-card--click bt-card--accent-navy bt-role" onclick="btEnterApp('rosen','rosen-vina')">
+          <div class="bt-medal bt-medal--navy"><svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M12 21s7-5.6 7-11a7 7 0 1 0-14 0c0 5.4 7 11 7 11z"/><circle cx="12" cy="10" r="2.6"/></svg></div>
+          <h2 class="bt-h2">Rosen</h2><p class="bt-body">Secuencia de ruta + Malla · Viña</p>
+          <span class="bt-btn bt-btn--navy" style="margin-top:6px">Entrar →</span>
+        </div>
+        <div class="bt-card bt-card--click bt-card--accent-coral bt-role" onclick="btEnterApp('canon','canon-vina')">
+          <div class="bt-medal bt-medal--coral"><svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M3 12h18M9 7V4h6v3"/></svg></div>
+          <h2 class="bt-h2">Big Ticket 360</h2><p class="bt-body">Malla de rotación · Viña</p>
+          <span class="bt-btn bt-btn--primary" style="margin-top:6px">Entrar →</span>
         </div>
       </div>
     </div>
@@ -336,7 +356,7 @@
       <div style="display:none"><span id="rol-lbl"></span></div>
       <div class="subtabs" id="brand-tabs" style="margin-bottom:8px;display:none">
         <button id="bt-rosen" class="on" onclick="setBrand('rosen')">🔵 Rosen</button>
-        <button id="bt-canon" onclick="setBrand('canon')">🟠 Canon</button>
+        <button id="bt-canon" onclick="setBrand('canon')">🟠 Big Ticket 360</button>
       </div>
       <div class="subtabs">
         <button id="st-b-seq" class="on" onclick="subTab('seq')">📋 Secuencia de ruta</button>
@@ -442,7 +462,7 @@
             <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:12px">
               <b style="font-size:11px;color:#8A8780">Filtrar:</b>
               <input id="flt-q" placeholder="🔍 patente" oninput="setFlotaFilt()" style="padding:4px 6px;font-size:12px;width:110px">
-              <select id="flt-cli" onchange="setFlotaFilt()" style="font-size:12px;padding:4px"><option value="">Cliente: todos</option><option value="rosen">Rosen</option><option value="canon">Canon</option></select>
+              <select id="flt-cli" onchange="setFlotaFilt()" style="font-size:12px;padding:4px"><option value="">Cliente: todos</option><option value="rosen">Rosen</option><option value="canon">Big Ticket 360</option></select>
               <select id="flt-reg" onchange="setFlotaFilt()" style="font-size:12px;padding:4px"><option value="">Región: todas</option><option value="vina">Viña (V)</option><option value="rm">RM</option></select>
               <select id="flt-rol" onchange="setFlotaFilt()" style="font-size:12px;padding:4px"><option value="">Rol: todos</option><option value="planta">Planta</option><option value="backup">Backup</option></select>
               <select id="flt-est" onchange="setFlotaFilt()" style="font-size:12px;padding:4px"><option value="">Estado: todos</option><option value="act">Activas</option><option value="ina">Inactivas</option></select>
@@ -454,7 +474,7 @@
               <button class="btn bg" style="padding:3px 8px;font-size:11px" onclick="bulkSelActiva(true)">✓ Activar</button>
               <button class="btn bg" style="padding:3px 8px;font-size:11px" onclick="bulkSelActiva(false)">⛔ Desactivar</button>
               <span style="display:flex;gap:3px;align-items:center;margin-left:4px;border-left:1px solid #cdd6df;padding-left:8px"><span style="font-size:10.5px;color:#8A8780">Operación:</span>
-                <select id="sel-op" style="font-size:11px;padding:3px"><option value="rosen-vina">Rosen Viña</option><option value="canon-rm">Canon RM</option><option value="canon-vina">Canon Viña</option></select>
+                <select id="sel-op" style="font-size:11px;padding:3px"><option value="rosen-vina">Rosen Viña</option><option value="canon-rm">RM1</option><option value="canon-vina">VM1</option></select>
                 <button class="btn bg" style="padding:3px 6px;font-size:11px" onclick="bulkSelOp(true)">＋ agregar</button>
                 <button class="btn bg" style="padding:3px 6px;font-size:11px" onclick="bulkSelOp(false)">− quitar</button>
               </span>
@@ -526,20 +546,22 @@ function supLogin(){
 }
 function supLogout(){supAuth=false;ROL='';try{sessionStorage.removeItem('supAuth');sessionStorage.removeItem('rol');}catch(_){}renderSup();btShowEntry('landing');}
 // ===== Puente: entrada bigticket ↔ app existente =====
-function btShowEntry(view){var e=$('bt-entry'),a=$('app-real');if(e)e.classList.remove('hidden');if(a)a.classList.add('hidden');if(view)btGo(view);}
-function btGo(view){['landing','login','operacion'].forEach(function(v){var el=$('view-'+v);if(el)el.hidden=(v!==view);});var er=$('bt-login-err');if(er)er.style.display='none';window.scrollTo(0,0);}
+function btShowEntry(view){LOCKOP='';var e=$('bt-entry'),a=$('app-real');if(e)e.classList.remove('hidden');if(a)a.classList.add('hidden');if(view)btGo(view);}
+function btGo(view){['landing','login','operacion','vm1'].forEach(function(v){var el=$('view-'+v);if(el)el.hidden=(v!==view);});var er=$('bt-login-err');if(er)er.style.display='none';window.scrollTo(0,0);}
 function btLogin(){
   var e=norm($('bt-email').value),p=($('bt-pass').value||'').trim();
   var c=CUENTAS.find(function(x){return norm(x.email)===e&&x.pass===p;});
   if(c){supAuth=true;ROL=c.rol;try{sessionStorage.setItem('supAuth','1');sessionStorage.setItem('rol',c.rol);}catch(_){}btGo('operacion');}
   else{var er=$('bt-login-err');if(er)er.style.display='block';}
 }
-function btEnterApp(role){
+var LOCKOP='';   // #req · operación fija según la bodega/operador elegido (bloquea el cambio de región dentro de la app)
+function btEnterApp(role,op){
   if(role!=='chofer'&&!supAuth){btShowEntry('login');return;}
+  LOCKOP=(role==='chofer')?'':(op||'');
   $('bt-entry').classList.add('hidden');$('app-real').classList.remove('hidden');
   var lbl=$('app-brand'),ops=$('btn-ops');
   if(role==='chofer'){setMode('cho');if(lbl)lbl.textContent='Chofer';if(ops)ops.style.display='none';}
-  else{setMode('sup');setBrand(role);subTab('malla');if(lbl)lbl.textContent=(role==='canon'?'Canon':'Rosen');if(ops)ops.style.display='';}
+  else{setMode('sup');setBrand(role);subTab('malla');if(lbl)lbl.textContent=(role==='canon'?'Big Ticket 360':'Rosen');if(ops)ops.style.display='';}
 }
 function btBackToOps(){btShowEntry(supAuth?'operacion':'landing');}
 function btLogout(){supLogout();}
@@ -950,7 +972,7 @@ async function cerrar(){
 }
 // ================= MARCAS (#26): Rosen (malla+secuencia) / Canon (solo malla, como está) =================
 let BRAND='rosen';
-function brandOps(b){return b==='canon'?[['canon-rm','Canon RM'],['canon-vina','Canon Viña']]:[['rosen-vina','Rosen Viña']];}
+function brandOps(b){return b==='canon'?[['canon-rm','RM1'],['canon-vina','VM1']]:[['rosen-vina','Rosen Viña']];}
 function isRosenOp(){return (MALLA.op||'').indexOf('rosen')===0;}   // las mejoras nuevas de malla son SOLO Rosen
 function setBrand(b){
   BRAND=b;
@@ -1040,7 +1062,7 @@ function bandaDe(h){const s=String(h||'').replace(/\s/g,'');const m=/(\d{1,2}):?
   if(a===18&&b===21)return {code:'NOC',lbl:'Nocturna (18-21)'};
   return {code:'OTRA',lbl:a+'-'+b};}
 function brandOf(op){return (op||'').indexOf('canon')===0?'canon':'rosen';}
-function opNombre(op){return {'rosen-vina':'Rosen Viña','canon-vina':'Canon Viña','canon-rm':'Canon RM','rosen-serena':'Rosen Serena','canon-serena':'Canon Serena'}[op]||op;}
+function opNombre(op){return {'rosen-vina':'Rosen Viña','canon-vina':'VM1','canon-rm':'RM1','rosen-serena':'Rosen Serena','canon-serena':'Canon Serena'}[op]||op;}
 // Comunas por zona (para la nomenclatura/leyenda #8)
 const ZONACOM={VN:['Viña del Mar'],QV:['Quilpué','Villa Alemana','El Belloto'],VL:['Valparaíso','Curauma'],CR:['Concón','Reñaca'],LO:['Limache','Olmué'],IN:['Quillota','La Cruz','La Calera','Nogales','Hijuelas'],CNR:['La Ligua','Cabildo','Papudo','Zapallar','Cachagua','Petorca','Los Molles','Pichidangui'],CNU:['Quintero','Puchuncaví','Horcón','Maitencillo','Ventanas','Loncura'],LI:['Algarrobo','El Quisco','El Tabo','Las Cruces','Isla Negra','Cartagena','San Antonio','Santo Domingo','Casablanca','Quintay','Tunquén'],US:['La Serena'],UC:['Coquimbo'],VS:['Paiguano','Vicuña'],OV:['Ovalle'],INC:['Combarbalá','Monte Patria','Punitaqui','Río Hurtado','Sotaquí','Illapel'],AN:['Andacollo'],CC:['Guanaqueros','Las Tacas','Puerto Velero','Tongoy','Totoralillo'],NP:['Lampa','Quilicura','Renca'],NC:['Huechuraba','Colina','Conchalí'],CEN:['Santiago','Independencia','Recoleta','Estación Central','Quinta Normal'],NOA:['Las Condes','Vitacura','Lo Barnechea'],OTE:['Providencia','Ñuñoa','La Reina','Peñalolén'],PON:['Maipú','Pudahuel','Cerro Navia','Lo Prado','Cerrillos'],SUR:['San Miguel','Macul','San Joaquín','La Cisterna','La Granja','San Ramón','P.A. Cerda','Lo Espejo'],SOR:['La Florida','Puente Alto','La Pintana','El Bosque','San Bernardo'],SEX:['Buin','Paine','Pirque'],SXT:['Padre Hurtado','Peñaflor','Talagante','Isla de Maipo','Calera de Tango','San José de Maipo'],STS:['Servicio técnico']};
 // Frecuencia: días en que sale cada zona (#10). Default = todos. Config por operación.
@@ -1054,7 +1076,7 @@ const FREQ_DEF={'canon-rm':{
   SUR:{L:1,M:0,X:1,J:0,V:1,S:0}, SOR:{L:1,M:1,X:1,J:1,V:1,S:0}, SEX:{L:0,M:1,X:0,J:1,V:0,S:0}, SXT:{L:0,M:1,X:0,J:1,V:0,S:0}
 }};
 function zonaDias(z){return FREQ[z]||(FREQ_DEF[MALLA.op]&&FREQ_DEF[MALLA.op][z])||{L:1,M:1,X:1,J:1,V:1,S:1};}
-function toggleDia(z,k){if(!esAdmin()){toast('Solo el administrador puede cambiar la frecuencia',1);return;}const f=Object.assign({L:1,M:1,X:1,J:1,V:1,S:1},FREQ[z]||{});f[k]=f[k]?0:1;FREQ[z]=f;saveFreq();renderVol();}
+function toggleDia(z,k){if(!esAdmin()){toast('Solo el administrador puede cambiar la frecuencia',1);return;}const cur=zonaDias(z);const f={L:cur.L?1:0,M:cur.M?1:0,X:cur.X?1:0,J:cur.J?1:0,V:cur.V?1:0,S:cur.S?1:0};f[k]=f[k]?0:1;FREQ[z]=f;saveFreq();renderVol();}   // #fix · parte de la frecuencia ACTUAL (override o default), no de "todos los días"
 function setVolView(v){volView=v;renderVol();if(v==='vol')renderCap();}
 
 // ---- Maestro de patentes (#5/#6) ----
@@ -1111,7 +1133,7 @@ function tipoDe(pat){const f=(FLOTA.pat||[]).find(o=>o.pat===pat);return f?(f.ti
 // Sub-paso A: definición de la pool (patente, m³, peso, tipo, operaciones + rol por operación, activa) + persistencia.
 // El enganche a la malla y el override semanal vienen en los sub-pasos B/C.
 let FLOTA={pat:[]};
-const OPS_FLOTA=[['rosen-vina','Rosen Viña'],['canon-rm','Canon RM'],['canon-vina','Canon Viña']];
+const OPS_FLOTA=[['rosen-vina','Rosen Viña'],['canon-rm','RM1'],['canon-vina','VM1']];
 // #39 · 5 TRAMOS de vehículo (es el `tipo` de la pool). clase = comportamiento: camioneta→Mini principal / camion→Big principal.
 // bigCupo = tope de nº de productos Big por ocio; bigMax = 'none'(0) / 'chico'(solo ≤1,5 m³) / 'any'.
 const TRAMOS={
@@ -1243,7 +1265,8 @@ function applyDay(){const k=pickOcupDia();MALLA.vol=MALLA.volDia[k]||{};MALLA.vo
 let zonaExp=null;
 function mallaKey(){return 'malla:'+MALLA.op+':'+MALLA.week;}
 async function loadMalla(){
-  MALLA.op=$('malla-op').value;
+  MALLA.op=LOCKOP||$('malla-op').value;   // #req · operación bloqueada a la bodega elegida
+  {const opSel=$('malla-op');if(opSel){if(LOCKOP){opSel.value=LOCKOP;opSel.style.display='none';let fx=$('malla-op-fixed');if(!fx){fx=document.createElement('span');fx.id='malla-op-fixed';fx.className='mrib-sel';fx.style.fontWeight='800';opSel.parentNode.insertBefore(fx,opSel);}fx.textContent=opNombre(LOCKOP);fx.style.display='';}else{opSel.style.display='';const fx2=$('malla-op-fixed');if(fx2)fx2.style.display='none';}}}
   if(!$('malla-week').value)$('malla-week').value=isoWeekKey(new Date());
   MALLA.week=$('malla-week').value;
   const body=$('malla-body'),empty=$('malla-empty');
@@ -1380,7 +1403,16 @@ function subirPreplany(e){
       const fcarga=new Date().toLocaleString('es-CL',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
       const day=pickOcupDia();const dayLbl=((DIAS.find(x=>x[0]===day)||[])[1])||day;   // #req2 · se ancla al DÍA seleccionado abajo
       const brand=(MALLA.op||'').indexOf('canon')===0?'canon':'rosen';const resumen=[];   // Canon también sube su pre-plani (solo para el visual de la malla; no baja informes)
+      const curReg=MALLA.op.indexOf('serena')>=0?'serena':(MALLA.op.indexOf('rm')>=0?'rm':'vina');   // #req · región de la operación elegida
+      // #req · acumular varias pre-planis en el mismo día (Sumar) o Reemplazar
+      const yaHay=MALLA.volDia&&MALLA.volDia[day]&&Object.keys(MALLA.volDia[day]).length>0;
+      const acumular=yaHay?confirm('Ya hay pre-plani cargada en '+dayLbl+'.\n\nAceptar = SUMAR esta a la que ya está (podés cargar 2, 3, 4…).\nCancelar = REEMPLAZAR la que hay.'):false;
+      const mNum=(p,a)=>{const o=Object.assign({},p||{});Object.keys(a||{}).forEach(z=>o[z]=(o[z]||0)+a[z]);return o;};
+      const mCom=(p,a)=>{const o=JSON.parse(JSON.stringify(p||{}));Object.keys(a||{}).forEach(z=>{o[z]=o[z]||{};Object.keys(a[z]).forEach(cc=>{o[z][cc]=o[z][cc]||{};Object.keys(a[z][cc]).forEach(f=>o[z][cc][f]=(o[z][cc][f]||0)+a[z][cc][f]);});});return o;};
+      const mSin=(p,a)=>{const o=JSON.parse(JSON.stringify(p||{}));Object.keys(a||{}).forEach(cc=>{o[cc]=o[cc]||{vol:0,g:0};o[cc].vol+=(a[cc].vol||0);o[cc].g+=(a[cc].g||0);});return o;};
+      const mBanda=(p,a)=>{const o=JSON.parse(JSON.stringify(p||{}));Object.keys(a||{}).forEach(c=>{o[c]=o[c]||{n:0,lbl:a[c].lbl,ords:[]};o[c].n+=(a[c].n||0);(a[c].ords||[]).forEach(x=>{if(o[c].ords.length<200)o[c].ords.push(x);});});return o;};
       for(const region of ['vina','serena','rm']){
+        if(brand==='canon'&&region!==curReg)continue;   // #req · Canon toma SOLO su región (RM ignora Viña; Viña se sube aparte en Canon Viña)
         const B=reg[region];if(!Object.keys(B.vol).length&&!Object.keys(B.sinz).length)continue;
         const op=brand+'-'+region;if(!ZONAS[op])continue;
         const key='malla:'+op+':'+MALLA.week;
@@ -1388,19 +1420,29 @@ function subirPreplany(e){
         const dd=(rr&&rr.length&&rr[0].data)?rr[0].data:{};
         dd.volDia=dd.volDia||{};dd.volgDia=dd.volgDia||{};dd.entDia=dd.entDia||{};dd.entm3Dia=dd.entm3Dia||{};dd.entcomDia=dd.entcomDia||{};dd.comdetDia=dd.comdetDia||{};dd.sinzDia=dd.sinzDia||{};dd.fcargaDia=dd.fcargaDia||{};dd.totOrdDia=dd.totOrdDia||{};
         dd.reprogDia=dd.reprogDia||{};dd.bandaDia=dd.bandaDia||{};
-        dd.volDia[day]=B.vol;dd.volgDia[day]=B.volg;dd.entDia[day]=B.ent;dd.entm3Dia[day]=B.entm3;dd.entcomDia[day]=B.entcom;dd.comdetDia[day]=B.comdet;dd.sinzDia[day]=B.sinz;dd.fcargaDia[day]=fcarga;dd.totOrdDia[day]=B.ord.size;
-        dd.reprogDia[day]=B.reprog;dd.bandaDia[day]=B.banda;
+        const ac=acumular&&dd.volDia[day]&&Object.keys(dd.volDia[day]).length>0;   // acumula solo si ya había algo en ESTE día/región
+        dd.volDia[day]=ac?mNum(dd.volDia[day],B.vol):B.vol;
+        dd.volgDia[day]=ac?mNum(dd.volgDia[day],B.volg):B.volg;
+        dd.entDia[day]=ac?mNum(dd.entDia[day],B.ent):B.ent;
+        dd.entm3Dia[day]=ac?mNum(dd.entm3Dia[day],B.entm3):B.entm3;
+        dd.entcomDia[day]=ac?mCom(dd.entcomDia[day],B.entcom):B.entcom;
+        dd.comdetDia[day]=ac?mCom(dd.comdetDia[day],B.comdet):B.comdet;
+        dd.sinzDia[day]=ac?mSin(dd.sinzDia[day],B.sinz):B.sinz;
+        dd.fcargaDia[day]=fcarga;
+        dd.totOrdDia[day]=ac?((dd.totOrdDia[day]||0)+B.ord.size):B.ord.size;
+        dd.reprogDia[day]=ac?((dd.reprogDia[day]||[]).concat(B.reprog)):B.reprog;
+        dd.bandaDia[day]=ac?mBanda(dd.bandaDia[day],B.banda):B.banda;
         dd.asign=dd.asign||{};dd.orig=dd.orig||{};dd.lock=dd.lock||{};dd.patManual=dd.patManual||[];
         await sbUpsert([{jornada:key,chofer:'__MALLA__',data:dd,cerrada:false}]);
-        resumen.push(opNombre(op)+' ('+Object.keys(B.vol).length+' zonas)');
+        resumen.push(opNombre(op)+' ('+Object.keys(dd.volDia[day]).length+' zonas'+(ac?' · sumada':'')+')');
       }
       // #18/#21 · el DETALLE crudo (para descargas Planificación/Bajadas/Ruta) es SOLO Rosen; Canon no baja informes y no debe pisarlo
       if(brand==='rosen'){
         const origHead=d[0].map(x=>x==null?'':x);
-        const origRows=d.slice(1).filter(r=>iO<0||String(r[iO]||'').trim());
+        let origRows=d.slice(1).filter(r=>iO<0||String(r[iO]||'').trim());
+        if(acumular){const pr=await sbGet(`jornada=eq.${encodeURIComponent('preplani:'+dayDateKey(day))}&chofer=eq.__DET__&select=data`);const prev=(pr&&pr.length&&pr[0].data&&Array.isArray(pr[0].data.rows))?pr[0].data.rows:[];origRows=prev.concat(origRows);}   // #req · acumula el detalle crudo al sumar pre-planis
         await sbUpsert([{jornada:'preplani:'+dayDateKey(day),chofer:'__DET__',data:{head:origHead,rows:origRows},cerrada:false}]);
       }
-      const curReg=MALLA.op.indexOf('serena')>=0?'serena':(MALLA.op.indexOf('rm')>=0?'rm':'vina');
       const showReg=Object.keys(reg[curReg].vol).length?curReg:majority;
       $('malla-op').value=brand+'-'+showReg;
       await loadMalla();
@@ -1506,10 +1548,11 @@ function renderExtra(){
     }
     // #39 · opciones MINI por zona: camioneta con entregas libres + camión (mini por ocio) con su m³ libre → entregas
     function optMiniZ(z){
+      const esVM1=MALLA.op==='canon-vina';   // #req · VM1 (Canon Viña): asignación de mini a camiones LIBRE, sin topes
       const cams=allP.filter(p=>claseDe(p)==='camioneta').map(p=>({p,cap:mt[p]?leftMini(p):topeMini(p,k)})).filter(o=>o.cap>0.5);
-      const camiones=allP.filter(p=>claseDe(p)==='camion'&&idleBig(p)>0.05).map(p=>({p,cap:Math.floor(idleBig(p)/avgMiniM3(k,z)),ocio:true})).filter(o=>o.cap>0);
+      const camiones=allP.filter(p=>claseDe(p)==='camion'&&(esVM1||idleBig(p)>0.05)).map(p=>({p,cap:esVM1?Infinity:Math.floor(idleBig(p)/avgMiniM3(k,z)),ocio:true,libre:esVM1})).filter(o=>o.cap>0);
       const list=cams.concat(camiones).sort((a,b)=>b.cap-a.cap);
-      return '<option value="">+ patente…</option>'+list.map(o=>`<option value="${o.p}">${o.p} · ${Math.round(o.cap)} ent${o.ocio?' (ocio)':''}</option>`).join('');
+      return '<option value="">+ patente…</option>'+list.map(o=>`<option value="${o.p}">${o.p} · ${o.libre?'libre':(Math.round(o.cap)+' ent'+(o.ocio?' (ocio)':''))}</option>`).join('');
     }
     const fB=Object.keys(ocB.demand).filter(z=>ocB.demand[z]>0&&!cubierta(ocB.demand[z],ocB.filled[z])).sort((a,b)=>(ocB.demand[b]-ocB.filled[b])-(ocB.demand[a]-ocB.filled[a]));
     const fM=Object.keys(ocM.demand).filter(z=>ocM.demand[z]>0&&(ocM.demand[z]-(ocM.filled[z]||0))>0.5).sort((a,b)=>(ocM.demand[b]-ocM.filled[b])-(ocM.demand[a]-ocM.filled[a]));
@@ -1598,10 +1641,15 @@ function computeOcupDay(k){
   const tByPat={};trucks.forEach(t=>tByPat[t.pat]=t);
   extras.forEach(e=>{const z=e.zona;if(!(z in remaining))return;
     if((MALLA.fueraSem||[]).indexOf(e.pat)>=0)return;   // #37B
-    const esCta=isCanonOp&&claseDe(e.pat)==='camioneta';   // #39 · camioneta = Big POR OCIO: cupo de productos × m³ prom, con pool por tamaño
+    const esCta=isCanonOp&&claseDe(e.pat)==='camioneta';   // #39 · camioneta = Big POR OCIO
     if(esCta&&!camPuedeBig(e.pat,z,k))return;   // pool: big grande (>1,5) no entra a camioneta chica (<10 m³)
+    if(esCta){   // #fix · la camioneta cubre hasta su CUPO (guías × m³ prom) EN ESTA zona, independiente por zona (no reparte el cupo entre varias zonas)
+      const cap=camBigCap(e.pat,z,k);const fill=Math.max(0,Math.min(cap,remaining[z]));remaining[z]-=fill;
+      let t=tByPat[e.pat];if(!t){t={pat:e.pat,cap:0,z1:'',z2:'',f1:0,f2:0,fe:0,idle:0,solo:false,extra:true,esCta:true};trucks.push(t);tByPat[e.pat]=t;}
+      t.fe=(t.fe||0)+fill;t.extraZona=z;return;
+    }
     let t=tByPat[e.pat];
-    if(!t){const cp=esCta?camBigCap(e.pat,z,k):capDe(e.pat);t={pat:e.pat,cap:cp,z1:'',z2:'',f1:0,f2:0,fe:0,idle:cp,solo:false,extra:true,esCta};trucks.push(t);tByPat[e.pat]=t;if(cp)anyCap=true;else if(!esCta&&noMT.indexOf(e.pat)<0)noMT.push(e.pat);}
+    if(!t){const cp=capDe(e.pat);t={pat:e.pat,cap:cp,z1:'',z2:'',f1:0,f2:0,fe:0,idle:cp,solo:false,extra:true};trucks.push(t);tByPat[e.pat]=t;if(cp)anyCap=true;else if(noMT.indexOf(e.pat)<0)noMT.push(e.pat);}
     const fill=Math.max(0,Math.min(t.idle,remaining[z]));t.fe=(t.fe||0)+fill;t.idle-=fill;remaining[z]-=fill;t.extraZona=z;});
   const filled={};Object.keys(demand).forEach(z=>filled[z]=demand[z]-(remaining[z]||0));
   const totIdle=trucks.reduce((s,t)=>s+t.idle,0),totCap=trucks.reduce((s,t)=>s+t.cap,0);
@@ -1628,7 +1676,7 @@ function computeOcupMini(k){
   const ocB=computeOcupDay(k);const idleByPat={};ocB.trucks.forEach(t=>{idleByPat[t.pat]=t.idle;});
   const extras=(MALLA.extraMiniDia&&MALLA.extraMiniDia[k])||[];const tByPat={};trucks.forEach(t=>tByPat[t.pat]=t);
   extras.forEach(e=>{const z=e.zona;if(!(z in remaining))return;if((MALLA.fueraSem||[]).indexOf(e.pat)>=0)return;let t=tByPat[e.pat];
-    if(!t){let cp;if(claseDe(e.pat)==='camioneta'){cp=topeMini(e.pat,k);}else{const idleM3=(idleByPat[e.pat]!=null?idleByPat[e.pat]:capDe(e.pat));cp=Math.floor(idleM3/avgMiniM3(k,z));}
+    if(!t){let cp;if(claseDe(e.pat)==='camioneta'){cp=topeMini(e.pat,k);}else if(MALLA.op==='canon-vina'){cp=Infinity;}else{const idleM3=(idleByPat[e.pat]!=null?idleByPat[e.pat]:capDe(e.pat));cp=Math.floor(idleM3/avgMiniM3(k,z));}   // #req · VM1: camión sin tope de mini
       t={pat:e.pat,left:cp};trucks.push(t);tByPat[e.pat]=t;}
     const fill=Math.max(0,Math.min(t.left,remaining[z]));t.left-=fill;remaining[z]-=fill;});
   const filled={};Object.keys(demand).forEach(z=>filled[z]=demand[z]-(remaining[z]||0));
@@ -1717,7 +1765,8 @@ function renderCap(){
     if(mz.length){
       miniHtml+=mz.map(z=>{const dem=om.demand[z];const fill=Math.round(om.filled[z]||0);const need=Math.ceil(dem/CANON_TOPE_ENT);const short=Math.max(0,dem-fill);const ok=short<=0;const cc=ZCOLOR[z]||'#B4B2A9';const m3z=(MALLA.entm3||{})[z]||0;
         const ecd=(MALLA.entcom||{})[z];const hasDet=ecd&&Object.keys(ecd).length;const exp=hasDet&&zonaExpMini===z;   // #39 · desglose mini por comuna
-        let outm=`<div style="display:flex;justify-content:space-between;align-items:center;border:1px solid ${ok?'rgba(31,122,84,.42)':'#e6e4dd'};background:${ok?'rgba(31,122,84,.08)':'#fff'};border-radius:8px;padding:6px 9px;margin-bottom:${exp?'0':'4px'};font-size:10.5px;${hasDet?'cursor:pointer':''}"${hasDet?` onclick="toggleZonaMini('${z}')" title="Ver comunas de la zona"`:''}><span><span class="zleg" style="background:${cc};color:${zfg(z)}">${z}</span> <span style="color:#8A8780">${need} camioneta${need>1?'s':''}${m3z?(' · '+m3z.toFixed(1)+' m³'):''}${hasDet?(' '+(exp?'▴':'▾')):''}</span></span><span><b style="color:${ok?'var(--bt-ok)':'var(--bt-coral-dark)'}">${fill}</b>/${dem} ${ok?'✓':('· faltan '+short)}</span></div>`;
+        const offFreqM=zonaDias(z)[k]===0;const bajBtnM=offFreqM?`<button class="lockbtn" style="padding:0 5px;margin-left:2px" title="No corresponde a la frecuencia del día — dejar en bodega" onclick="event.stopPropagation();bajarZona('${z}')">🔻</button>`:'';   // #fix · bajar zona mini fuera de frecuencia
+        let outm=`<div style="display:flex;justify-content:space-between;align-items:center;border:1px solid ${ok?'rgba(31,122,84,.42)':'#e6e4dd'};background:${ok?'rgba(31,122,84,.08)':'#fff'};border-radius:8px;padding:6px 9px;margin-bottom:${exp?'0':'4px'};font-size:10.5px;${hasDet?'cursor:pointer':''}"${hasDet?` onclick="toggleZonaMini('${z}')" title="Ver comunas de la zona"`:''}><span><span class="zleg" style="background:${cc};color:${zfg(z)}">${z}</span>${bajBtnM} <span style="color:#8A8780">${need} camioneta${need>1?'s':''}${m3z?(' · '+m3z.toFixed(1)+' m³'):''}${hasDet?(' '+(exp?'▴':'▾')):''}</span></span><span><b style="color:${ok?'var(--bt-ok)':'var(--bt-coral-dark)'}">${fill}</b>/${dem} ${ok?'✓':('· faltan '+short)}</span></div>`;
         if(exp){const cks=Object.keys(ecd).sort((a,b)=>ecd[b].ent-ecd[a].ent);outm+='<div class="comdet" style="margin-bottom:4px">'+cks.map(c=>`<span class="comrow"><span>${c}</span><b>${ecd[c].ent} ent · ${ecd[c].m3.toFixed(1)} m³</b></span>`).join('')+'</div>';}
         return outm;}).join('')
         +'<div style="font-size:10px;color:#8A8780;text-align:right;margin-top:2px">Total mini: <b>'+totEnt+'</b> entregas · ~<b>'+totNeed+'</b> camionetas'+(totEntM3?(' · <b>'+totEntM3.toFixed(1)+'</b> m³ real'):'')+'</div>';
