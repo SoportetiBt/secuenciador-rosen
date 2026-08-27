@@ -1289,7 +1289,7 @@ async function loadMalla(){
 function buildOcupSnap(){
   const dias={};
   DIAS.forEach(([k])=>{const o=computeOcupDay(k);const zonas={};Object.keys(o.demand).forEach(z=>{zonas[z]={dem:+o.demand[z].toFixed(2),fill:+o.filled[z].toFixed(2)};});dias[k]={veh:o.veh,totCap:+o.totCap.toFixed(2),idle:+o.totIdle.toFixed(2),zonas};});
-  return {ts:new Date().toISOString(),vol:MALLA.vol,volg:MALLA.volg,totOrd:MALLA.totOrd,fcarga:MALLA.fcarga,dias};
+  return {op:MALLA.op,ts:new Date().toISOString(),vol:MALLA.vol,volg:MALLA.volg,totOrd:MALLA.totOrd,fcarga:MALLA.fcarga,dias};   // #fix · etiqueta la operación para no cruzar snapshots
 }
 async function saveMalla(notify){
   if(!MALLA.op)return false;
@@ -1785,22 +1785,27 @@ function renderCap(){
 }
 // #19b · histórico de ocupación por día (del snapshot guardado), debajo de la malla
 function renderHist(){
-  const box=$('malla-hist');if(!box)return;const oc=MALLA.ocup;
+  const box=$('malla-hist');if(!box)return;let oc=MALLA.ocup;
+  if(oc&&oc.op&&oc.op!==MALLA.op)oc=null;   // #fix · el snapshot guardado es de otra operación → no mostrarlo acá
   if(!oc||!oc.dias){box.innerHTML='';return;}   // Canon = Rosen: histórico en ambos
+  const opZ=new Set((ZONAS[MALLA.op]||[]).map(a=>a[0]));   // solo zonas de la operación actual
   const ds=weekDates(MALLA.week);
   const rows=DIAS.map(([k,lbl],i)=>{const dd=oc.dias[k];if(!dd||!dd.veh)return '';const dn=ds?(' '+ds[i].getUTCDate()):'';
-    const zk=Object.keys(dd.zonas||{}).filter(z=>dd.zonas[z].dem>0);const full=zk.filter(z=>dd.zonas[z].fill>=dd.zonas[z].dem-0.05).length;
+    const zk=Object.keys(dd.zonas||{}).filter(z=>dd.zonas[z].dem>0&&opZ.has(z));if(!zk.length)return '';const full=zk.filter(z=>dd.zonas[z].fill>=dd.zonas[z].dem-0.05).length;
     return `<div style="display:flex;justify-content:space-between;gap:8px;border:1px solid #eee;border-radius:7px;padding:4px 8px;margin-bottom:3px;font-size:10.5px"><span><b>${lbl}${dn}</b> · ${dd.veh} veh</span><span>${dd.totCap.toFixed(1)} m³${dd.idle>0.05?(' · ociosa '+dd.idle.toFixed(1)):''} · ${full}/${zk.length} zonas llenas</span></div>`;}).join('');
   box.innerHTML=rows?('<div style="font-size:10px;color:#8A8780;margin-bottom:4px">Histórico de ocupación por día (se guarda al presionar 💾; pasá el mouse por el día en la malla para el detalle)</div>'+rows):'';
 }
 // #22 · pop-over con el resumen guardado del día al posicionarse en el encabezado
 function dayPop(k,ev){
-  const pop=$('day-pop');const oc=MALLA.ocup;const lbl=((DIAS.find(d=>d[0]===k)||[])[1])||k;
+  const pop=$('day-pop');let oc=MALLA.ocup;const lbl=((DIAS.find(d=>d[0]===k)||[])[1])||k;
+  if(oc&&oc.op&&oc.op!==MALLA.op)oc=null;   // #fix · snapshot de otra operación → no cruzar
+  const opZ=new Set((ZONAS[MALLA.op]||[]).map(a=>a[0]));   // solo zonas de la operación actual
   let html='<div style="font-weight:800;color:#002E5D;margin-bottom:4px">'+lbl+' · resumen guardado</div>';
-  if(!oc||!oc.dias||!oc.dias[k]||!oc.dias[k].veh){html+='<div style="color:#8A8780">Sin datos guardados para este día. Asigná camiones y guardá la malla (💾) para capturarlo.</div>';}
-  else{const dd=oc.dias[k];
+  const _dd=oc&&oc.dias&&oc.dias[k];const _zk=_dd?Object.keys(_dd.zonas).filter(z=>_dd.zonas[z].dem>0&&opZ.has(z)):[];
+  if(!_dd||!_dd.veh||!_zk.length){html+='<div style="color:#8A8780">Sin datos guardados para este día. Asigná camiones y guardá la malla (💾) para capturarlo.</div>';}
+  else{const dd=_dd;
     html+='<div style="margin-bottom:4px">🚚 <b>'+dd.veh+'</b> veh · <b>'+dd.totCap.toFixed(1)+'</b> m³'+(dd.idle>0.05?(' · ociosa '+dd.idle.toFixed(1)):'')+'</div>';
-    const zk=Object.keys(dd.zonas).filter(z=>dd.zonas[z].dem>0).sort((a,b)=>dd.zonas[b].dem-dd.zonas[a].dem);
+    const zk=_zk.sort((a,b)=>dd.zonas[b].dem-dd.zonas[a].dem);
     html+=zk.map(z=>{const zz=dd.zonas[z];const full=cubierta(zz.dem,zz.fill);const c=ZCOLOR[z]||'#888';return '<div style="display:flex;justify-content:space-between;gap:8px;margin-bottom:1px"><span class="zleg" style="background:'+c+';color:'+zfg(z)+'">'+z+'</span><span>'+zz.fill.toFixed(1)+'/'+zz.dem.toFixed(1)+' m³'+(full?' ✓':'')+'</span></div>';}).join('');
     if(oc.fcarga)html+='<div style="color:#8A8780;margin-top:5px;font-size:10px">Pre-plani: '+oc.fcarga+(oc.totOrd?(' · '+oc.totOrd+' órdenes'):'')+'</div>';
   }
