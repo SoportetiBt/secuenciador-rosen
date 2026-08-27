@@ -1265,7 +1265,7 @@ function applyDay(){const k=pickOcupDia();MALLA.vol=MALLA.volDia[k]||{};MALLA.vo
 let zonaExp=null;
 function mallaKey(){return 'malla:'+MALLA.op+':'+MALLA.week;}
 async function loadMalla(){
-  MALLA.op=LOCKOP||$('malla-op').value;   // #req · operación bloqueada a la bodega elegida
+  MALLA.op=LOCKOP||$('malla-op').value;MALLA.loadedOp=null;   // #req · op bloqueada a la bodega · #fix marca "en carga" para bloquear guardados cruzados
   {const opSel=$('malla-op');if(opSel){if(LOCKOP){opSel.value=LOCKOP;opSel.style.display='none';let fx=$('malla-op-fixed');if(!fx){fx=document.createElement('span');fx.id='malla-op-fixed';fx.className='mrib-sel';fx.style.fontWeight='800';opSel.parentNode.insertBefore(fx,opSel);}fx.textContent=opNombre(LOCKOP);fx.style.display='';}else{opSel.style.display='';const fx2=$('malla-op-fixed');if(fx2)fx2.style.display='none';}}}
   if(!$('malla-week').value)$('malla-week').value=isoWeekKey(new Date());
   MALLA.week=$('malla-week').value;
@@ -1280,6 +1280,7 @@ async function loadMalla(){
   MALLA.reprogDia=d.reprogDia||{};MALLA.bandaDia=d.bandaDia||{};MALLA.extraDia=d.extraDia||{};MALLA.extraMiniDia=d.extraMiniDia||{};MALLA.bajaZonaDia=d.bajaZonaDia||{};
   MALLA.prioPat=d.prioPat||{};MALLA.comunasDia=d.comunasDia||{};   // #39 · prioridad de línea por patente + override de comunas por día
   MALLA.fueraSem=d.fueraServicio||[];   // #37B · patentes fuera de servicio ESTA semana (no borra la pool; no se hereda: cada semana arranca sin bajas)
+  MALLA.loadedOp=MALLA.op;   // #fix · datos ya cargados y consistentes con esta operación → recién ahora se permite guardar
   zonaExp=null;ocupDia=d.selDia||'';   // #28 · abre en el día que quedó guardado
   // migración: registros viejos con vol plano (por semana) → lo pasamos al día por defecto
   if(!Object.keys(MALLA.volDia).length && d.vol && Object.keys(d.vol).length){const mk=pickOcupDia();MALLA.volDia[mk]=d.vol;MALLA.volgDia[mk]=d.volg||{};MALLA.comdetDia[mk]=d.comdet||{};MALLA.sinzDia[mk]=d.sinzona||{};MALLA.fcargaDia[mk]=d.fcarga||'';MALLA.totOrdDia[mk]=d.totOrd||0;}
@@ -1293,6 +1294,7 @@ function buildOcupSnap(){
 }
 async function saveMalla(notify){
   if(!MALLA.op)return false;
+  if(MALLA.loadedOp!==MALLA.op){console.warn('saveMalla BLOQUEADO — malla en carga u operación distinta ('+MALLA.loadedOp+' vs '+MALLA.op+') · se evita cruzar mallas');if(notify)toast('Un momento, la malla está cargando…',1);return false;}   // #fix · evita cruce/pérdida entre operaciones
   const ocup=buildOcupSnap();MALLA.ocup=ocup;renderHist();
   const ok=await sbUpsert([{jornada:mallaKey(),chofer:'__MALLA__',data:{asign:MALLA.asign,orig:MALLA.orig,lock:MALLA.lock,patManual:MALLA.patManual,ocup,selDia:pickOcupDia(),
     volDia:MALLA.volDia,volgDia:MALLA.volgDia,entDia:MALLA.entDia,entm3Dia:MALLA.entm3Dia,entcomDia:MALLA.entcomDia,comdetDia:MALLA.comdetDia,sinzDia:MALLA.sinzDia,fcargaDia:MALLA.fcargaDia,totOrdDia:MALLA.totOrdDia,reprogDia:MALLA.reprogDia,bandaDia:MALLA.bandaDia,extraDia:MALLA.extraDia,extraMiniDia:MALLA.extraMiniDia,bajaZonaDia:MALLA.bajaZonaDia,prioPat:MALLA.prioPat,comunasDia:MALLA.comunasDia,fueraServicio:MALLA.fueraSem||[]},cerrada:false}]);
