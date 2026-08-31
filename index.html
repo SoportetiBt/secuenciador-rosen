@@ -360,11 +360,17 @@
       </div>
       <div class="subtabs">
         <button id="st-b-seq" class="on" onclick="subTab('seq')">📋 Secuencia de ruta</button>
+        <button id="st-b-etq" style="display:none" onclick="subTab('etq')">🏷 Etiquetas Hoja1</button>
         <button id="st-b-malla" onclick="subTab('malla')">🗓 Malla de rotación</button>
         <button id="st-b-flota" style="display:none" onclick="subTab('flota')">🚚 Flota</button>
       </div>
 
       <div id="st-seq">
+        <div class="card" style="border:2px solid #0a7d3a;background:#f2fbf5">
+          <label>📅 Día de la secuencia <span id="seq-day-lbl" style="font-weight:600;color:#0a7d3a"></span></label>
+          <input type="date" id="seq-day" onchange="setSeqDay(this.value)" style="width:100%">
+          <div class="hint">Cada día vive <b>separado</b>: puedes preparar la secuencia del lunes aunque hoy esté cargada la de mañana. Por defecto se pone el <b>próximo día hábil</b>; cámbialo si necesitas otro. Todo (subir, estado, descargas, limpiar) trabaja sobre ESTE día.</div>
+        </div>
         <div class="card">
           <label>1 · Sube el Excel de planificación</label>
           <input type="file" id="file" accept=".xlsx,.xls" onchange="subirExcel(event)">
@@ -383,6 +389,57 @@
             <button class="btn bg" onclick="limpiarJornada()">🗑 <span id="limpiar-lbl">Limpiar jornada (nuevo día)</span></button>
           </div>
           <div class="hint"><b>Ruta</b>: formato simple por patente para el chofer (completa Centro/Comuna/HR cruzando con la pre-planilla). <b>Planificación</b>: idéntica al archivo del cliente (Hoja1 + Rpt. HojasRutas). <b>Bajadas</b>: archivo puro con las órdenes que estaban en la pre-planilla y ningún chofer secuenció. (Planificación/Bajadas usan la pre-planilla subida en la pestaña Malla.)</div>
+        </div>
+        <!-- #pm · Agregar pedido a mano (ej. reprogramación) → se agrega a la secuencia de la patente del día -->
+        <details class="card" id="pm-card" style="border:2px solid #2F5277">
+          <summary style="cursor:pointer;font-weight:800;color:#002E5D;list-style:none">➕ Agregar un pedido a mano <span style="font-weight:600;color:#6b7280;font-size:12px">(ej. una repro) — toca para abrir</span></summary>
+          <div style="margin-top:12px">
+            <div class="hint" style="margin-top:0">Se agrega a la secuencia de la patente en el <b>día seleccionado arriba</b>. Los campos con * son obligatorios.</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:8px 0">
+              <div><label style="font-size:12px">N° de guía *</label><input id="pm-guia" placeholder="Ej. 001234567" style="width:100%"></div>
+              <div><label style="font-size:12px">Patente *</label><input id="pm-pat" list="pm-pat-list" placeholder="Ej. ABCD12" style="width:100%;text-transform:uppercase"><datalist id="pm-pat-list"></datalist></div>
+              <div><label style="font-size:12px">Comuna *</label><input id="pm-com" placeholder="Ej. Viña del Mar" style="width:100%"></div>
+              <div><label style="font-size:12px">Dirección *</label><input id="pm-dir" placeholder="Calle y número" style="width:100%"></div>
+            </div>
+            <details style="margin:4px 0 10px">
+              <summary style="cursor:pointer;color:#2F5277;font-size:13px;font-weight:700">Campos opcionales (cliente, hora, teléfono, coordenadas)</summary>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px">
+                <div><label style="font-size:12px">Cliente</label><input id="pm-cli" placeholder="Nombre" style="width:100%"></div>
+                <div><label style="font-size:12px">Hora / banda</label><input id="pm-hora" placeholder="Ej. 09:00-13:00" style="width:100%"></div>
+                <div><label style="font-size:12px">Teléfono</label><input id="pm-tel" placeholder="+56 9…" style="width:100%"></div>
+                <div></div>
+                <div><label style="font-size:12px">Latitud</label><input id="pm-lat" placeholder="-33.0…" style="width:100%"></div>
+                <div><label style="font-size:12px">Longitud</label><input id="pm-lng" placeholder="-71.5…" style="width:100%"></div>
+              </div>
+            </details>
+            <div class="actions">
+              <button class="btn b1" onclick="addPedidoManual()">➕ Agregar a la secuencia</button>
+              <button class="btn bg" onclick="limpiarPedidoManual()">Limpiar campos</button>
+            </div>
+          </div>
+        </details>
+      </div>
+
+      <!-- ===== ETIQUETAS Hoja1 (Big Ticket 360 / Canon) ===== -->
+      <div id="st-etq" class="hidden">
+        <div class="card" style="border:2px solid #E08A2B;background:#fff8f0">
+          <label>📅 Día de las etiquetas <span id="etq-day-lbl" style="font-weight:600;color:#c26a00"></span></label>
+          <input type="date" id="etq-day" onchange="etqSetDay(this.value)" style="width:100%">
+          <div class="hint">Por defecto el <b>próximo día hábil</b> (RM1 lun-vie · VM1 lun-sáb); cámbialo si necesitas otro. La <b>comuna</b> sale de la pre-planilla subida en la pestaña Malla para ESTE día; el <b>orden</b> y la <b>patente</b> salen del archivo planificado (Detalle del plan).</div>
+        </div>
+        <div class="card">
+          <label>1 · Sube el archivo planificado (Detalle del plan)</label>
+          <input type="file" id="etq-file" accept=".xlsx,.xls" onchange="etqSubir(event)">
+          <div class="hint">Es el export de DispatchTrack. Se lee la hoja <b>“Detalle del plan”</b> (patente = <i>ID vehiculo</i>, orden y guía). Puedes subir <b>varios</b> (se suman). </div>
+        </div>
+        <div class="card">
+          <label>2 · Estado <button class="btn bg" style="float:right;padding:5px 10px;font-size:12px" onclick="etqEstado()">↻ Actualizar</button></label>
+          <div id="etq-estado"><div class="empty">Sube el planificado o toca “Actualizar”.</div></div>
+          <div class="actions">
+            <button class="btn b1" onclick="etqDescargar()">⬇ Etiquetas Hoja1</button>
+            <button class="btn bg" onclick="etqLimpiar()">🗑 Limpiar día</button>
+          </div>
+          <div class="hint"><b>Reglas:</b> guía de <b>otra región</b> → patente <b>NODO</b> · orden <b>«<span id="etq-otro">VM1</span>»</b>. Guía de esta operación en la pre-planilla pero <b>sin planificar</b> → patente <b>FR</b> · orden <b>«<span id="etq-este">RM1</span>»</b>. El resto: patente y orden del planificado. La Hoja1 sale con columnas <b>ID vehiculo · Fecha · Orden · ID guia · Comuna</b>.</div>
         </div>
       </div>
 
@@ -491,6 +548,11 @@
   <!-- ===== CHOFER ===== -->
   <div id="panel-cho" class="hidden">
     <div class="card">
+      <label>Día de la ruta</label>
+      <input type="date" id="cho-day" onchange="setSeqDay(this.value)" style="width:100%">
+      <div class="hint">Normalmente es hoy. Si tu ruta es de otro día, cámbialo aquí.</div>
+    </div>
+    <div class="card">
       <label>Elegí tu ruta / patente <button class="btn bg" style="float:right;padding:5px 10px;font-size:12px" onclick="cargarChoferes()">↻</button></label>
       <select id="chofer-sel" onchange="abrirRuta()"><option value="">— elige tu patente —</option></select>
     </div>
@@ -520,9 +582,28 @@
 const SB_URL='https://uxyxdfbmfviofwdxmqsq.supabase.co';
 const SB_KEY='sb_publishable_SI6kt_9ioxvIg3VaZOqXdA_zrIry6pR';
 const TABLE='rosen_seq';
-// La jornada es POR DÍA: cada día arranca limpio (no aparecen rutas viejas/cerradas de días anteriores),
-// pero dentro del mismo día se pueden sumar varios archivos (Rosen V + Rosen IV).
+// La jornada del SECUENCIADOR es POR DÍA y POR OPERACIÓN.
+//  · Se elige el DÍA de trabajo con un selector (por defecto, el PRÓXIMO día hábil). Así se puede
+//    preparar la secuencia del lunes aunque hoy esté cargada la de mañana (cada día vive separado).
+//  · Las claves incluyen la OPERACIÓN (rosen-vina / canon-rm / canon-vina) para que NO se crucen
+//    los datos de una operación con otra (Rosen ≠ Big Ticket 360, RM1 ≠ VM1).
 const _hoy=new Date(); const JORNADA='d'+_hoy.getFullYear()+'-'+String(_hoy.getMonth()+1).padStart(2,'0')+'-'+String(_hoy.getDate()).padStart(2,'0');
+function _dk(d){return 'd'+d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function _sabHabil(op){return op==='canon-vina'||op==='rosen-vina';}   // VM1 y Rosen Viña trabajan sábado (L-S); RM1 solo L-V
+function proxDiaHabil(op){const d=new Date();do{d.setDate(d.getDate()+1);}while(d.getDay()===0||(!_sabHabil(op)&&d.getDay()===6));return d;}
+let SEQOP='rosen-vina';                 // operación del secuenciador (Rosen por defecto; cada pestaña la fija)
+let SEQDAY=_dk(proxDiaHabil('rosen-vina'));  // día de trabajo elegido (clave dYYYY-MM-DD)
+let seqDayManual=false;                 // true cuando el usuario elige la fecha a mano (no la auto-recalculamos)
+function jornKey(){return 'seq:'+SEQOP+':'+SEQDAY;}         // filas de secuencia = por operación + día
+function preplaniKey(dk){return 'preplani:'+SEQOP+':'+(dk||SEQDAY);}   // pre-plani = por operación + día
+function seqDayDMY(){const m=/d(\d{4})-(\d{2})-(\d{2})/.exec(SEQDAY);return m?(m[3]+'-'+m[2]+'-'+m[1]):SEQDAY;}
+function seqDayInput(){const m=/d(\d{4}-\d{2}-\d{2})/.exec(SEQDAY);return m?m[1]:'';}   // para <input type=date>
+// Recalcula el día por defecto (próximo hábil) mientras el usuario no lo haya fijado a mano.
+function autoSeqDay(op){if(seqDayManual)return;SEQOP=op||SEQOP;SEQDAY=_dk(proxDiaHabil(SEQOP));syncSeqDayUI();}
+function setSeqDay(v){if(!v)return;SEQDAY='d'+v;seqDayManual=true;syncSeqDayUI();if(!$('panel-cho').classList.contains('hidden')){cargarChoferes();$('ruta-card').style.display='none';}else{cargarEstado();}}
+function syncSeqDayUI(){const a=$('seq-day'),b=$('cho-day');if(a)a.value=seqDayInput();if(b)b.value=seqDayInput();const l=$('seq-day-lbl');if(l)l.textContent='· '+seqDayDMY();}
+// El CHOFER trabaja el día de HOY por defecto (maneja hoy). Mientras no lo cambie a mano, se mantiene en hoy.
+function choDayHoy(){if(seqDayManual)return;SEQOP='rosen-vina';SEQDAY=_dk(new Date());syncSeqDayUI();}
 const H={'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json'};
 const $=id=>document.getElementById(id);
 function toast(m,e){const t=$('toast');t.textContent=m;t.className='toast show'+(e?' err':'');clearTimeout(t._t);t._t=setTimeout(()=>t.className='toast',2600);}
@@ -576,7 +657,7 @@ function setMode(m){
   $('m-sup').classList.toggle('on',m==='sup');$('m-cho').classList.toggle('on',m==='cho');
   $('panel-sup').classList.toggle('hidden',m!=='sup');$('panel-cho').classList.toggle('hidden',m!=='cho');
   if(m==='cho')document.body.classList.remove('mallawide');
-  if(m==='sup')renderSup(); else cargarChoferes();
+  if(m==='sup')renderSup(); else {choDayHoy();cargarChoferes();}
   updateJumpBtn();
 }
 // #36 · Salto Chofer ↔ Malla SOLO con sesión de supervisor activa (el chofer suelto no ve el botón). Chofer es exclusivo de Rosen.
@@ -630,8 +711,8 @@ function subirExcel(e){
       const lote=(f.name||'').replace(/\.[^.]+$/,'').replace(/[_]+/g,' ').trim()||'Sin nombre'; // etiqueta = nombre del archivo (ej. "Rosen V")
       const rows=[];
       // fila especial con la planilla original completa (para reexportar)
-      rows.push({jornada:JORNADA,chofer:'__PLANILLA__',data:{head,filas,iO,iCh},cerrada:false});
-      Object.keys(byCh).forEach(ch=>rows.push({jornada:JORNADA,chofer:ch,data:{paradas:byCh[ch],seq:byCh[ch].map(p=>p.orden),lote},cerrada:false}));
+      rows.push({jornada:jornKey(),chofer:'__PLANILLA__',data:{head,filas,iO,iCh},cerrada:false});
+      Object.keys(byCh).forEach(ch=>rows.push({jornada:jornKey(),chofer:ch,data:{paradas:byCh[ch],seq:byCh[ch].map(p=>p.orden),lote},cerrada:false}));
       const ok=await sbUpsert(rows);   // se AGREGAN/actualizan (no borra lo ya publicado): permite subir Rosen V y Rosen IV en archivos distintos
       if(ok){toast('Publicado: +'+Object.keys(byCh).length+' rutas (se suman a las ya cargadas).');cargarEstado();}
     }catch(err){toast('Error: '+err.message,1);}
@@ -644,9 +725,10 @@ function subirExcel(e){
 let _estadoRows=[]; // cache para filtrar por lote sin re-consultar
 function loteDe(r){return (r.data&&r.data.lote)||'(sin lote)';}
 async function cargarEstado(){
-  const rows=await sbGet(`jornada=eq.${JORNADA}&select=chofer,cerrada,data&chofer=neq.__PLANILLA__`);
+  const rows=await sbGet(`jornada=eq.${encodeURIComponent(jornKey())}&select=chofer,cerrada,data&chofer=neq.__PLANILLA__`);
   if(!rows){return;}
   _estadoRows=rows;
+  const dl=$('pm-pat-list');if(dl)dl.innerHTML=rows.map(r=>`<option value="${r.chofer.replace(/"/g,'')}">`).join('');   // #pm · patentes existentes para autocompletar
   // armar el filtro de lotes/regiones
   const lotes=[...new Set(rows.map(loteDe))].sort((a,b)=>a.localeCompare(b));
   const wrap=$('lote-filtro-wrap'),sel=$('lote-filtro');
@@ -678,7 +760,7 @@ function renderEstado(){
   }).join('');
 }
 async function reabrir(ch){
-  const ok=await sbUpsert([{jornada:JORNADA,chofer:ch,cerrada:false}]);
+  const ok=await sbUpsert([{jornada:jornKey(),chofer:ch,cerrada:false}]);
   if(ok){toast('Ruta de '+ch+' reabierta');cargarEstado();}
 }
 async function limpiarJornada(){
@@ -687,13 +769,13 @@ async function limpiarJornada(){
     const chs=[...new Set((_estadoRows||[]).filter(r=>loteDe(r)===f).map(r=>r.chofer))];
     if(!chs.length){toast('No hay patentes en ese lote',1);return;}
     if(!confirm('¿Eliminar el lote “'+f+'”? Se borran solo esas '+chs.length+' patentes y sus secuencias. El resto (otros lotes) queda intacto.'))return;
-    for(const ch of chs){await sbDelete('jornada=eq.'+JORNADA+'&chofer=eq.'+encodeURIComponent(ch));}
+    for(const ch of chs){await sbDelete('jornada=eq.'+encodeURIComponent(jornKey())+'&chofer=eq.'+encodeURIComponent(ch));}
     if($('lote-filtro'))$('lote-filtro').value='';
     toast('Lote eliminado: '+f); cargarEstado(); return;
   }
-  if(!confirm('¿Limpiar TODA la jornada? Se borran TODAS las rutas y secuencias (todos los lotes). Úsalo al empezar el día. Si quieres borrar solo un archivo, fíltralo arriba primero.'))return;
-  await sbDelete('jornada=eq.'+JORNADA);
-  toast('Jornada limpiada — sube la planificación del día'); cargarEstado();
+  if(!confirm('¿Limpiar TODA la jornada del día '+seqDayDMY()+'? Se borran TODAS las rutas y secuencias (todos los lotes) de ESE día y operación. No afecta otros días. Si quieres borrar solo un archivo, fíltralo arriba primero.'))return;
+  await sbDelete('jornada=eq.'+encodeURIComponent(jornKey()));
+  toast('Jornada limpiada ('+seqDayDMY()+') — sube la planificación del día'); cargarEstado();
 }
 
 // ---------- SUPERVISOR: descargar (#16/#18/#21 · Ruta + Planificación tal cual + Bajadas puro) ----------
@@ -706,8 +788,12 @@ function mallaDayStamp(){if(MALLA.op&&MALLA.week){const mch=/d(\d{4}-\d{2}-\d{2}
 function mallaDayStampDMY(){const m=/(\d{4})-(\d{2})-(\d{2})/.exec(mallaDayStamp());return m?(m[3]+'-'+m[2]+'-'+m[1]):mallaDayStamp();}
 // #18 · lee el DETALLE crudo de la pre-planilla del día (para cruce y descargas). Devuelve {head,rows,índices} o null.
 async function readPreplani(){
-  // #req2 · baja con la fecha del DÍA que está en la MALLA (no la de hoy); fallback a hoy
-  const keys=[];if(MALLA.op&&MALLA.week)keys.push('preplani:'+dayDateKey(pickOcupDia()));keys.push('preplani:'+JORNADA);
+  // #seqdia · la pre-plani se lee por OPERACIÓN + DÍA del secuenciador (SEQDAY). Fallbacks: día de la malla y claves antiguas (solo fecha, compat).
+  const keys=[];
+  keys.push(preplaniKey(SEQDAY));                                             // op + día elegido (nuevo)
+  if(MALLA.op&&MALLA.week)keys.push('preplani:'+MALLA.op+':'+dayDateKey(pickOcupDia()));  // op + día de la malla cargada
+  keys.push('preplani:'+SEQDAY);                                             // compat: secuencia antigua (solo fecha)
+  if(MALLA.op&&MALLA.week)keys.push('preplani:'+dayDateKey(pickOcupDia()));   // compat: malla antigua (solo fecha)
   for(const key of [...new Set(keys)]){
     const rows=await sbGet(`jornada=eq.${encodeURIComponent(key)}&chofer=eq.__DET__&select=data`);
     if(!rows||!rows.length||!rows[0].data||!rows[0].data.head)continue;
@@ -761,9 +847,12 @@ async function mallaAsignDia(){
 function crossFromPreplani(pp){const m={};if(!pp)return m;pp.rows.forEach(r=>{const o=String(r[pp.iO]||'').trim();if(!o||m[o])return;m[o]={centro:pp.iCentro>=0?String(r[pp.iCentro]||'').trim():'',com:pp.iCom>=0?String(r[pp.iCom]||'').trim():'',hr:pp.iHR>=0?String(r[pp.iHR]||'').trim():'',hora:pp.iHora>=0?String(r[pp.iHora]||'').trim():'',cli:pp.iCli>=0?String(r[pp.iCli]||'').trim():'',dir:pp.iDir>=0?String(r[pp.iDir]||'').trim():''};});return m;}
 // #18 robusto · cruza contra TODA la pre-plani guardada en la base (una sola consulta, sin depender de adivinar el día/semana).
 async function crossAllDays(){
-  const recs=await sbGet(`chofer=eq.__DET__&jornada=like.preplani:*&select=data`);
+  // #seqdia · solo la pre-plani de ESTA operación (evita cruces entre Rosen / RM1 / VM1). Incluye claves antiguas (solo fecha) como compat.
+  const recs=(await sbGet(`chofer=eq.__DET__&jornada=like.preplani:${SEQOP}:*&select=data`))||[];
+  const legacy=(await sbGet(`chofer=eq.__DET__&jornada=like.preplani:d*&select=data`))||[];   // compat: pre-planis antiguas sin operación
+  const recsAll=recs.concat(legacy);
   const m={};const def={centro:'',hr:''};
-  (recs||[]).forEach(rec=>{
+  recsAll.forEach(rec=>{
     const data=rec.data;if(!data||!data.head)return;
     const head=data.head,rws=data.rows||[];const hl=head.map(x=>String(x).trim().toLowerCase());
     const col=(...n)=>{for(const x of n){const i=hl.findIndex(h=>h===x||h.includes(x));if(i>=0)return i;}return -1;};
@@ -795,7 +884,7 @@ function hojaRuta(r,cross){
 const RUTACOLS=[{wch:22},{wch:22},{wch:24},{wch:34},{wch:16},{wch:14},{wch:10},{wch:10},{wch:9}];
 // Formato RUTA: una hoja por patente (respeta el lote filtrado). Cruza con la pre-planilla (#18).
 async function dlRutaFmt(){
-  const all=await sbGet(`jornada=eq.${JORNADA}&select=chofer,data&chofer=neq.__PLANILLA__`);
+  const all=await sbGet(`jornada=eq.${encodeURIComponent(jornKey())}&select=chofer,data&chofer=neq.__PLANILLA__`);
   if(!all||!all.length){toast('No hay datos para descargar',1);return;}
   const f=($('lote-filtro')&&$('lote-filtro').value)||'';
   const sel=f?all.filter(r=>loteDe(r)===f):all;
@@ -819,18 +908,18 @@ async function dlRutaFmt(){
   }
   if(!wb.SheetNames.length){toast('Aún no hay secuencias cargadas por los choferes',1);return;}
   const tag=f?' '+f.replace(/[^0-9A-Za-z]+/g,'-').replace(/^-|-$/g,''):'';
-  XLSX.writeFile(wb,'Ruta Rosen V'+tag+' '+mallaDayStampDMY()+'.xlsx');
+  XLSX.writeFile(wb,'Ruta Rosen V'+tag+' '+seqDayDMY()+'.xlsx');
   toast('Ruta descargada ('+n+' patentes'+(nBaj?(' + '+nBaj+' bajadas'):'')+')');
 }
 // Descargar el formato RUTA de UNA patente (botón ⬇ del estado).
 async function descargarRuta(ch){
-  const rr=await sbGet(`jornada=eq.${JORNADA}&chofer=eq.${encodeURIComponent(ch)}&select=chofer,data`);
+  const rr=await sbGet(`jornada=eq.${encodeURIComponent(jornKey())}&chofer=eq.${encodeURIComponent(ch)}&select=chofer,data`);
   if(!rr||!rr.length){toast('No encontré la ruta',1);return;}
   const cross=await crossAllDays();
   const h=hojaRuta(rr[0],cross);if(!h){toast('Esa patente aún no tiene secuencia',1);return;}
   const ws=XLSX.utils.aoa_to_sheet(h.aoa);ws['!cols']=RUTACOLS;
   const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,h.name);
-  XLSX.writeFile(wb,'Ruta '+ch.replace(/[^0-9A-Za-z]/g,'')+' '+mallaDayStampDMY()+'.xlsx');
+  XLSX.writeFile(wb,'Ruta '+ch.replace(/[^0-9A-Za-z]/g,'')+' '+seqDayDMY()+'.xlsx');
   toast('Descargada ruta de '+ch);
 }
 // #21 · Hoja1 dinámica por patente (Columna3): recuento distinto Nro.F12/Dirección + Σ Volumen/Columna2 + Total general.
@@ -851,12 +940,12 @@ async function dlPlanFmt(){
   const pp=await readPreplani();
   if(!pp){toast('No hay pre-planilla del día. Subíla en la pestaña Malla (⬆ Pre-planilla).',1);return;}
   // Patente por orden = de la SECUENCIA (cada chofer secuenció sus órdenes exactas); si la orden no está secuenciada, cae a la zona de la malla.
-  const seqRows=await sbGet(`jornada=eq.${JORNADA}&chofer=neq.__PLANILLA__&select=chofer,data`);
+  const seqRows=await sbGet(`jornada=eq.${encodeURIComponent(jornKey())}&chofer=neq.__PLANILLA__&select=chofer,data`);
   const ordPat={};(seqRows||[]).forEach(r=>{const seq=(r.data&&r.data.seq)||[];seq.forEach(o=>{const s=String(o).trim();if(!s)return;if(!ordPat[s])ordPat[s]=r.chofer;const no=normOrd(s);if(no&&!ordPat[no])ordPat[no]=r.chofer;});});
   const patOf=r=>{const o=String(r[pp.iO]||'').trim();return ordPat[o]||ordPat[normOrd(o)]||'BAJADA';};   // #34 · si no está en secuencia → BAJADA
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rptSheetAoa(pp,pp.rows,patOf)),'Rpt. HojasRutas');
-  XLSX.writeFile(wb,'Planificacion Rosen V '+mallaDayStampDMY()+'.xlsx');
+  XLSX.writeFile(wb,'Planificacion Rosen V '+seqDayDMY()+'.xlsx');
   const nB=pp.rows.filter(r=>{const o=String(r[pp.iO]||'').trim();return o&&!ordPat[o]&&!ordPat[normOrd(o)];}).length;
   toast('Planificación descargada'+(nB?(' · '+nB+' líneas BAJADA'):''));
 }
@@ -864,7 +953,7 @@ async function dlPlanFmt(){
 async function dlBajadas(){
   const pp=await readPreplani();
   if(!pp){toast('No hay pre-planilla del día para calcular bajadas.',1);return;}
-  const all=await sbGet(`jornada=eq.${JORNADA}&select=chofer,data&chofer=neq.__PLANILLA__`);
+  const all=await sbGet(`jornada=eq.${encodeURIComponent(jornKey())}&select=chofer,data&chofer=neq.__PLANILLA__`);
   const seqSet={};(all||[]).forEach(r=>{const seq=(r.data&&r.data.seq)||[];seq.forEach(o=>seqSet[String(o).trim()]=1);});
   const bajRows=pp.rows.filter(r=>{const o=String(r[pp.iO]||'').trim();return o&&!seqSet[o];});
   if(!bajRows.length){toast('Sin bajadas: todas las órdenes fueron secuenciadas ✓');return;}
@@ -873,21 +962,21 @@ async function dlBajadas(){
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(pivotHoja1(bajRows,pp.iO,pp.iPat,pp.iVol,pp.iCol2,pp.iDir,patOf)),'Hoja1');
   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rptSheetAoa(pp,bajRows,patOf)),'Rpt. HojasRutas');
-  XLSX.writeFile(wb,'Bajadas Rosen V '+mallaDayStampDMY()+'.xlsx');
+  XLSX.writeFile(wb,'Bajadas Rosen V '+seqDayDMY()+'.xlsx');
   toast('Bajadas descargadas · '+bajRows.length+' líneas');
 }
 
 // ---------- CHOFER ----------
 let items=[],curChofer='',curCerrada=false,curLote='';
 async function cargarChoferes(){
-  const rows=await sbGet(`jornada=eq.${JORNADA}&select=chofer&chofer=neq.__PLANILLA__`);
+  const rows=await sbGet(`jornada=eq.${encodeURIComponent(jornKey())}&select=chofer&chofer=neq.__PLANILLA__`);
   const sel=$('chofer-sel');
   if(!rows||!rows.length){sel.innerHTML='<option value="">— no hay rutas publicadas —</option>';return;}
   sel.innerHTML='<option value="">— elige tu patente —</option>'+rows.sort((a,b)=>a.chofer.localeCompare(b.chofer)).map(r=>`<option value="${r.chofer.replace(/"/g,'')}">${r.chofer}</option>`).join('');
 }
 async function abrirRuta(){
   const ch=$('chofer-sel').value;if(!ch){$('ruta-card').style.display='none';return;}
-  const rows=await sbGet(`jornada=eq.${JORNADA}&chofer=eq.${encodeURIComponent(ch)}&select=chofer,data,cerrada`);
+  const rows=await sbGet(`jornada=eq.${encodeURIComponent(jornKey())}&chofer=eq.${encodeURIComponent(ch)}&select=chofer,data,cerrada`);
   if(!rows||!rows.length){toast('No encontré esa ruta',1);return;}
   const r=rows[0];curChofer=ch;curCerrada=!!r.cerrada;curLote=(r.data&&r.data.lote)||'';
   const paradas=r.data.paradas||[],seq=r.data.seq||paradas.map(p=>p.orden);
@@ -962,13 +1051,155 @@ function navegarMaps(){
   window.open('https://www.google.com/maps/dir/'+pts.slice(0,10).join('/'),'_blank');
 }
 async function guardar(){
-  const ok=await sbUpsert([{jornada:JORNADA,chofer:curChofer,data:{paradas:items,seq:items.map(p=>p.orden),lote:curLote},cerrada:false}]);
+  const ok=await sbUpsert([{jornada:jornKey(),chofer:curChofer,data:{paradas:items,seq:items.map(p=>p.orden),lote:curLote},cerrada:false}]);
   if(ok)toast('Orden guardado ✓');
 }
 async function cerrar(){
   if(!confirm('¿Cerrar la ruta? Queda bloqueada hasta que el supervisor la reabra.'))return;
-  const ok=await sbUpsert([{jornada:JORNADA,chofer:curChofer,data:{paradas:items,seq:items.map(p=>p.orden),lote:curLote},cerrada:true}]);
+  const ok=await sbUpsert([{jornada:jornKey(),chofer:curChofer,data:{paradas:items,seq:items.map(p=>p.orden),lote:curLote},cerrada:true}]);
   if(ok){curCerrada=true;render();toast('Ruta cerrada 🔒');}
+}
+// ================= #pm · AGREGAR PEDIDO A MANO (Rosen) =================
+function _v(id){const e=$(id);return e?String(e.value||'').trim():'';}
+function limpiarPedidoManual(){['pm-guia','pm-pat','pm-com','pm-dir','pm-cli','pm-hora','pm-tel','pm-lat','pm-lng'].forEach(id=>{const e=$(id);if(e)e.value='';});}
+async function addPedidoManual(){
+  const g=_v('pm-guia'),pat=_v('pm-pat').toUpperCase(),com=_v('pm-com'),dir=_v('pm-dir');
+  if(!g||!pat||!com||!dir){toast('Faltan campos obligatorios: N° guía, Patente, Comuna y Dirección.',1);return;}
+  const cli=_v('pm-cli'),hora=_v('pm-hora'),tel=_v('pm-tel'),lat=_v('pm-lat'),lng=_v('pm-lng');
+  const parada={orden:g,cliente:cli,direccion:[dir,com].filter(Boolean).join(', '),lat,lng,centro:'',dir:dir,comuna:com,hora:hora,hr:'',cond:'',tel:tel,manual:true};
+  // trae la ruta existente de esa patente en el día seleccionado (si no existe, la crea)
+  const rr=await sbGet(`jornada=eq.${encodeURIComponent(jornKey())}&chofer=eq.${encodeURIComponent(pat)}&select=data,cerrada`);
+  let data,cerr=false;
+  if(rr&&rr.length){data=rr[0].data||{};cerr=!!rr[0].cerrada;}else{data={paradas:[],seq:[],lote:'Manual'};}
+  data.paradas=data.paradas||[];data.seq=data.seq||[];
+  if(data.seq.map(o=>String(o).trim()).includes(g)){toast('Esa guía ya está en la secuencia de '+pat,1);return;}
+  if(cerr&&!confirm('La ruta de '+pat+' está cerrada. ¿Reabrir para agregar este pedido?'))return;
+  data.paradas.push(parada);data.seq.push(g);
+  const ok=await sbUpsert([{jornada:jornKey(),chofer:pat,data:data,cerrada:false}]);   // al agregar a mano, la ruta queda abierta para que el chofer la vea
+  if(ok){toast('Pedido '+g+' agregado a '+pat+' ('+data.seq.length+' paradas) · '+seqDayDMY());limpiarPedidoManual();cargarEstado();}
+}
+// ================= ETIQUETAS Hoja1 (Big Ticket 360 / Canon) =================
+// Universo = PRE-PLANILLA (Malla): da la comuna y qué guías deben etiquetarse.
+// Planificado = "Detalle del plan" (export DispatchTrack): da patente (ID vehiculo) y orden por guía.
+// Reglas: otra región → NODO / código-otra-operación · esta región sin planificar → FR / código-esta-operación.
+let ETQ={op:'canon-rm',day:_dk(proxDiaHabil('canon-rm')),manual:false};
+function etqOp(){return (MALLA.op&&MALLA.op.indexOf('canon')===0)?MALLA.op:ETQ.op;}
+function etqKey(){return 'etq:'+etqOp()+':'+ETQ.day;}                 // planificado (Detalle del plan) por op+día
+function etqPreKey(){return 'preplani:'+etqOp()+':'+ETQ.day;}         // pre-plani por op+día (misma clave que escribe la Malla)
+function _dmy(dk){const m=/d?(\d{4})-(\d{2})-(\d{2})/.exec(dk||'');return m?(m[3]+'-'+m[2]+'-'+m[1]):(dk||'');}
+function etqDMY(){return _dmy(ETQ.day);}
+function etqDayInput(){const m=/d(\d{4}-\d{2}-\d{2})/.exec(ETQ.day);return m?m[1]:'';}
+function etqCodEste(){return etqOp()==='canon-vina'?'VM1':'RM1';}
+function etqCodOtro(){return etqOp()==='canon-vina'?'RM1':'VM1';}
+function etqRegEsta(){return etqOp()==='canon-vina'?'vina':'rm';}
+const _RMZ=new Set(['NP','NC','CEN','NOA','OTE','PON','SUR','SOR','SEX','SXT']);
+const _VZ=new Set(['VN','QV','VL','CR','LO','IN','CNR','CNU','LI']);
+function _regTxt(s){s=norm(s);if(s.indexOf('metropol')>=0)return 'rm';if(s.indexOf('valpar')>=0)return 'vina';return '';}
+function etqRegionDe(reg,com){const r=_regTxt(reg);if(r)return r;const z=matchZona(com);if(_RMZ.has(z))return 'rm';if(_VZ.has(z))return 'vina';return '';}
+function normGuia(x){return String(x||'').replace(/\D/g,'').replace(/^0+/,'');}   // guía = solo dígitos, sin ceros a la izquierda
+// Días (clave dYYYY-MM-DD) que YA tienen pre-plani cargada para esta operación (para no obligar a re-subirla).
+async function etqDaysConPre(){
+  const recs=await sbGet(`chofer=eq.__DET__&jornada=like.preplani:${etqOp()}:d*&select=jornada`);
+  const days=[...new Set((recs||[]).map(r=>{const m=/:(d\d{4}-\d{2}-\d{2})$/.exec(r.jornada);return m?m[1]:null;}).filter(Boolean))];
+  days.sort();return days;   // ascendente
+}
+// Al entrar: elige por defecto el día que YA tiene pre-plani (el de la malla si aplica; si no, el más reciente). Solo si el usuario no fijó la fecha a mano.
+async function etqEnter(){
+  ETQ.op=etqOp();
+  if(!ETQ.manual){
+    const days=await etqDaysConPre();
+    const mallaDay=(MALLA.op&&MALLA.week)?dayDateKey(pickOcupDia()):null;
+    if(mallaDay&&days.indexOf(mallaDay)>=0)ETQ.day=mallaDay;            // el día que está viendo en la malla (su pre-plani está cargada)
+    else if(days.length)ETQ.day=days[days.length-1];                   // el último día con pre-plani cargada
+    else ETQ.day=_dk(proxDiaHabil(ETQ.op));                            // no hay ninguna → próximo hábil (tendrá que subirla en Malla)
+  }
+  etqSyncUI();etqEstado();
+}
+function etqSyncUI(){const i=$('etq-day');if(i)i.value=etqDayInput();const l=$('etq-day-lbl');if(l)l.textContent='· '+etqDMY();const a=$('etq-otro'),b=$('etq-este');if(a)a.textContent=etqCodOtro();if(b)b.textContent=etqCodEste();}
+function etqSetDay(v){if(!v)return;ETQ.day='d'+v;ETQ.manual=true;etqSyncUI();etqEstado();}
+// Sube el planificado (Detalle del plan) → mapa guía→{pat,ord}. Acumula con lo ya subido para ese día/op.
+function etqSubir(e){
+  const f=e.target.files[0];if(!f)return;
+  const rd=new FileReader();
+  rd.onload=async ev=>{
+    try{
+      const wb=XLSX.read(ev.target.result,{type:'binary'});
+      let ws=null;for(const s of wb.SheetNames){if(norm(s).indexOf('detalle')>=0){ws=wb.Sheets[s];break;}}
+      if(!ws)ws=wb.Sheets[wb.SheetNames[0]];
+      const d=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+      let hi=-1;for(let i=0;i<Math.min(d.length,12);i++){const hl=(d[i]||[]).map(x=>norm(x));if(hl.some(x=>x.indexOf('guia')>=0)&&hl.some(x=>x.indexOf('vehiculo')>=0||x.indexOf('patente')>=0)){hi=i;break;}}
+      if(hi<0)hi=0;
+      const head=(d[hi]||[]).map(x=>String(x).trim());const hl=head.map(x=>norm(x));
+      const find=(...names)=>{for(const n of names){const i=hl.findIndex(x=>x===n||x.includes(n));if(i>=0)return i;}return -1;};
+      const iPat=find('id vehiculo','vehiculo','patente','ppu','movil');
+      const iGuia=find('id guia','guia','nro.f12','numero guia');
+      const iOrd=find('orden','secuencia','stop','parada','posicion');
+      if(iGuia<0||iPat<0){toast('No encontré ID guia / ID vehiculo. Encabezados: '+head.filter(Boolean).slice(0,10).join(' | '),1);return;}
+      const map={};let n=0;
+      d.slice(hi+1).forEach(r=>{const g=normGuia(r[iGuia]);if(!g)return;const pat=String(r[iPat]||'').trim();if(!pat)return;
+        if(!map[g]){map[g]={pat,ord:(iOrd>=0?String(r[iOrd]||'').trim():'')};n++;}});
+      if(!n){toast('No leí guías del archivo (revisa la hoja "Detalle del plan").',1);return;}
+      const prev=await sbGet(`jornada=eq.${encodeURIComponent(etqKey())}&chofer=eq.__DETALLE__&select=data`);
+      const base=(prev&&prev.length&&prev[0].data&&prev[0].data.map)||{};
+      const merged=Object.assign({},base,map);
+      const ok=await sbUpsert([{jornada:etqKey(),chofer:'__DETALLE__',data:{map:merged},cerrada:false}]);
+      if(ok){toast('Planificado cargado: +'+n+' guías (total '+Object.keys(merged).length+')');etqEstado();}
+    }catch(err){toast('Error: '+err.message,1);}
+    finally{e.target.value='';}
+  };
+  rd.readAsBinaryString(f);
+}
+async function etqLoadDetalle(){const r=await sbGet(`jornada=eq.${encodeURIComponent(etqKey())}&chofer=eq.__DETALLE__&select=data`);return (r&&r.length&&r[0].data&&r[0].data.map)||null;}
+async function etqLoadPre(){const r=await sbGet(`jornada=eq.${encodeURIComponent(etqPreKey())}&chofer=eq.__DET__&select=data`);return (r&&r.length&&r[0].data&&r[0].data.head)?r[0].data:null;}
+async function etqEstado(){
+  const box=$('etq-estado');if(!box)return;
+  box.innerHTML='<div class="empty">Cargando…</div>';
+  const det=await etqLoadDetalle(),pre=await etqLoadPre();
+  const nDet=det?Object.keys(det).length:0,nPre=pre?(pre.rows||[]).length:0;
+  let preLine;
+  if(pre){preLine='<b>Pre-planilla</b> ('+etqDMY()+') · '+nPre+' líneas ✓ <span style="color:#0a7d3a">(ya cargada, no hay que re-subirla)</span>';}
+  else{
+    const days=await etqDaysConPre();
+    if(days.length){preLine='<b>Pre-planilla</b> · no hay para el '+etqDMY()+'. Días con pre-plani cargada: <b>'+days.map(_dmy).join(' · ')+'</b> — elige el día arriba.';}
+    else{preLine='<b>Pre-planilla</b> · no encuentro ninguna de esta operación. Súbela en la pestaña Malla (una vez con esta versión).';}
+  }
+  box.innerHTML='<div class="rstat"><span class="rsl"><b>Planificado</b> · '+nDet+' guías'+(nDet?'':' — sube el Detalle del plan')+'</span></div>'+
+    '<div class="rstat"><span class="rsl">'+preLine+'</span></div>';
+}
+async function etqLimpiar(){
+  if(!confirm('¿Limpiar el planificado del día '+etqDMY()+' ('+etqCodEste()+')? No borra la pre-planilla.'))return;
+  await sbDelete('jornada=eq.'+encodeURIComponent(etqKey())+'&chofer=eq.__DETALLE__');
+  toast('Planificado limpiado ('+etqDMY()+')');etqEstado();
+}
+async function etqDescargar(){
+  const pre=await etqLoadPre();
+  if(!pre){const days=await etqDaysConPre();toast(days.length?('No hay pre-plani para el '+etqDMY()+'. Elige un día con pre-plani: '+days.map(_dmy).join(' · ')):('No encuentro pre-plani de esta operación. Súbela en la pestaña Malla.'),1);return;}
+  const det=await etqLoadDetalle()||{};
+  const head=pre.head,hl=head.map(x=>norm(x));
+  const col=(...n)=>{for(const x of n){const i=hl.findIndex(h=>h===x||h.includes(x));if(i>=0)return i;}return -1;};
+  const iG=col('nro.f12','numero guia','id guia','guia','orden');   // guía en la pre-plani (Canon: columna "Orden")
+  const iCom=col('comuna'),iReg=col('region','región');
+  if(iG<0){toast('No encontré la columna de guía/orden en la pre-planilla.',1);return;}
+  const fecha=etqDMY();
+  const rows=[['ID vehiculo','Fecha','Orden','ID guia','Comuna']];
+  const usados={};let nNormal=0,nNodo=0,nFr=0;
+  (pre.rows||[]).forEach(r=>{
+    const guiaRaw=String(r[iG]||'').trim();const g=normGuia(guiaRaw);if(!g||usados[g])return;usados[g]=1;
+    const com=iCom>=0?String(r[iCom]||'').trim():'';
+    const reg=etqRegionDe(iReg>=0?r[iReg]:'',com);
+    let pat,ord;
+    if(reg&&reg!==etqRegEsta()){pat='NODO';ord=etqCodOtro();nNodo++;}         // otra región → NODO / código otra operación
+    else if(det[g]){pat=det[g].pat;ord=det[g].ord||'';nNormal++;}             // planificado → patente + orden reales
+    else{pat='FR';ord=etqCodEste();nFr++;}                                    // esta operación, sin planificar → FR / código esta operación
+    rows.push([pat,fecha,ord,guiaRaw,com]);
+  });
+  Object.keys(det).forEach(g=>{if(usados[g])return;usados[g]=1;rows.push([det[g].pat,fecha,det[g].ord||'',g,'']);nNormal++;});   // planificadas que no venían en la pre-plani
+  if(rows.length<=1){toast('No hay datos para la Hoja1.',1);return;}
+  const wb=XLSX.utils.book_new();
+  const ws=XLSX.utils.aoa_to_sheet(rows);ws['!cols']=[{wch:14},{wch:12},{wch:10},{wch:16},{wch:22}];
+  XLSX.utils.book_append_sheet(wb,ws,'Hoja1');
+  XLSX.writeFile(wb,'Etiquetas '+etqCodEste()+' '+etqDMY()+'.xlsx');
+  toast('Hoja1 descargada · '+nNormal+' planif · '+nNodo+' NODO · '+nFr+' FR');
 }
 // ================= MARCAS (#26): Rosen (malla+secuencia) / Canon (solo malla, como está) =================
 let BRAND='rosen';
@@ -979,6 +1210,7 @@ function setBrand(b){
   $('bt-rosen').classList.toggle('on',b==='rosen');
   $('bt-canon').classList.toggle('on',b==='canon');
   $('st-b-seq').style.display=(b==='rosen')?'':'none';                                   // la Secuencia es exclusiva de Rosen
+  const etb=$('st-b-etq');if(etb)etb.style.display=(b==='canon')?'':'none';              // #etq · Etiquetas Hoja1 exclusivo de Big Ticket 360
   const pre=$('malla-preplani-lbl');if(pre)pre.style.display='';     // Canon = Rosen (misma malla por ahora)
   const sel=$('malla-op');const ops=brandOps(b);
   sel.innerHTML=ops.map(([v,l])=>`<option value="${v}">${l}</option>`).join('');
@@ -989,9 +1221,14 @@ function setBrand(b){
 // ================= MALLA DE ROTACIÓN =================
 function subTab(t){
   if(t==='flota'&&!esAdmin())t='malla';   // la Flota es solo del administrador
+  if(t==='etq'&&BRAND!=='canon')t='malla';   // Etiquetas Hoja1 solo Big Ticket 360
   $('st-b-seq').classList.toggle('on',t==='seq');$('st-b-malla').classList.toggle('on',t==='malla');$('st-b-flota').classList.toggle('on',t==='flota');
+  const eb=$('st-b-etq');if(eb)eb.classList.toggle('on',t==='etq');
   $('st-seq').classList.toggle('hidden',t!=='seq');$('st-malla').classList.toggle('hidden',t!=='malla');$('st-flota').classList.toggle('hidden',t!=='flota');
+  const ep=$('st-etq');if(ep)ep.classList.toggle('hidden',t!=='etq');
   document.body.classList.toggle('mallawide',t==='malla');   // #29 · ensancha en el modo malla
+  if(t==='seq'){SEQOP='rosen-vina';autoSeqDay('rosen-vina');syncSeqDayUI();const l=$('seq-day-lbl');if(l)l.textContent='· '+seqDayDMY();cargarEstado();}   // #seqdia · la Secuencia es Rosen; día por defecto = próximo hábil
+  if(t==='etq')etqEnter();   // #etq · Etiquetas Hoja1 (Canon): fija op+día y refresca estado
   if(t==='malla')loadC2Z().then(loadMaestro).then(loadFlota).then(loadMalla);   // #37c · la flota alimenta la malla
   if(t==='flota')loadMaestro().then(loadFlota).then(renderFlota);   // #37 · mantenedor de flota (pool)
 }
@@ -1438,12 +1675,17 @@ function subirPreplany(e){
         await sbUpsert([{jornada:key,chofer:'__MALLA__',data:dd,cerrada:false}]);
         resumen.push(opNombre(op)+' ('+Object.keys(dd.volDia[day]).length+' zonas'+(ac?' · sumada':'')+')');
       }
-      // #18/#21 · el DETALLE crudo (para descargas Planificación/Bajadas/Ruta) es SOLO Rosen; Canon no baja informes y no debe pisarlo
-      if(brand==='rosen'){
+      // #18/#21/#etq · el DETALLE crudo (para descargas Rosen y para Etiquetas Hoja1 de Canon). Se guarda por OPERACIÓN + DÍA.
+      {
+        // op de la pre-plani = la bodega/operación en la que está el supervisor (LOCKOP); fallback por marca+región.
+        const detOp=LOCKOP||(brand+'-'+(Object.keys(reg[curReg].vol).length?curReg:majority));
         const origHead=d[0].map(x=>x==null?'':x);
         let origRows=d.slice(1).filter(r=>iO<0||String(r[iO]||'').trim());
-        if(acumular){const pr=await sbGet(`jornada=eq.${encodeURIComponent('preplani:'+dayDateKey(day))}&chofer=eq.__DET__&select=data`);const prev=(pr&&pr.length&&pr[0].data&&Array.isArray(pr[0].data.rows))?pr[0].data.rows:[];origRows=prev.concat(origRows);}   // #req · acumula el detalle crudo al sumar pre-planis
-        await sbUpsert([{jornada:'preplani:'+dayDateKey(day),chofer:'__DET__',data:{head:origHead,rows:origRows},cerrada:false}]);
+        const ppk='preplani:'+detOp+':'+dayDateKey(day);
+        if(acumular){let pr=await sbGet(`jornada=eq.${encodeURIComponent(ppk)}&chofer=eq.__DET__&select=data`);
+          if((!pr||!pr.length)&&brand==='rosen'){pr=await sbGet(`jornada=eq.${encodeURIComponent('preplani:'+dayDateKey(day))}&chofer=eq.__DET__&select=data`);}  // compat: pre-plani Rosen antigua sin operación
+          const prev=(pr&&pr.length&&pr[0].data&&Array.isArray(pr[0].data.rows))?pr[0].data.rows:[];origRows=prev.concat(origRows);}   // #req · acumula el detalle crudo al sumar pre-planis
+        await sbUpsert([{jornada:ppk,chofer:'__DET__',data:{head:origHead,rows:origRows},cerrada:false}]);
       }
       const showReg=Object.keys(reg[curReg].vol).length?curReg:majority;
       $('malla-op').value=brand+'-'+showReg;
